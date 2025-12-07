@@ -1,14 +1,13 @@
 from pydantic import BaseModel
 
 class AdminCreate(BaseModel):
-    telegram_id: str
-    username: str
+    telegram_id: int
     password: str
 
 class AdminResponse(BaseModel):
     id: int
-    telegram_id: str
-    username: str
+    telegram_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
