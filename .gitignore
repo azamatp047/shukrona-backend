@@ -1,0 +1,44 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtual environment
+
+venv/
+env/
+ENV/
+
+# VS Code
+
+.vscode/
+
+# Mac OS
+
+.DS_Store
+
+# Logs
+
+*.log
+
+# Database
+
+*.sqlite3
+
+# Pytest cache
+
+.pytest_cache/
+
+# Uvicorn reload files
+
+*.db
+*.sqlite
+*.sqlite-journal
+
+# Environment variables
+
+.env
+.env.*
