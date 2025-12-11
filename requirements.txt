@@ -3,3 +3,7 @@ uvicorn
 python-dotenv
 sqlalchemy
 psycopg2-binary
+pydantic
+python-telegram-bot
+requests
+httpx

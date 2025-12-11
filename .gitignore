@@ -42,3 +42,10 @@ ENV/
 
 .env
 .env.*
+
+# txt files
+run.txt
+
+bot_admin.py
+bot_user.py
+bot_courier.py
