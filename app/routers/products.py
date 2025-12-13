@@ -1,15 +1,21 @@
-import shutil
-import os
-import uuid
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from cloudinary.uploader import upload as cloud_upload, destroy as cloud_destroy
+import cloudinary
 
 from app.database import SessionLocal
 from app.models import Product
-from app.schemas.product import ProductCreate, ProductListRead, ProductDetailRead
-from app.config import UPLOAD_DIR
+from app.schemas.product import ProductListRead, ProductDetailRead
 from app.dependencies import require_admin
+from app.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+
+# Cloudinary config
+cloudinary.config(
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET
+)
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -20,34 +26,38 @@ def get_db():
     finally:
         db.close()
 
-def save_upload_file(upload_file: UploadFile) -> str:
-    extension = os.path.splitext(upload_file.filename)[1]
-    new_filename = f"{uuid.uuid4()}{extension}"
-    file_path = os.path.join(UPLOAD_DIR, new_filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
-    return f"/static/images/{new_filename}"
+# Cloudinary helper functions
+def upload_to_cloudinary(file) -> dict:
+    result = cloud_upload(file, folder="products", overwrite=True)
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"]
+    }
+
+def delete_from_cloudinary(public_id: Optional[str]):
+    if public_id:
+        cloud_destroy(public_id)
 
 # CREATE
 @router.post("/", response_model=ProductDetailRead)
 def create_product(
     name: str = Form(...),
-    buy_price: float = Form(...),  # <-- Yangi
-    sell_price: float = Form(...), # <-- Yangi
-    stock: int = Form(...),        # <-- Yangi
+    buy_price: float = Form(...),
+    sell_price: float = Form(...),
+    stock: int = Form(...),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
-    image_url = save_upload_file(image)
-    # price degan ustunni sell_price ga o'zgartirdik modelda
+    upload_result = upload_to_cloudinary(image.file)
     db_product = Product(
-        name=name, 
-        buy_price=buy_price, 
-        sell_price=sell_price, 
-        stock=stock, 
-        image=image_url
+        name=name,
+        buy_price=buy_price,
+        sell_price=sell_price,
+        stock=stock,
+        image=upload_result["url"]
     )
+    # Saqlash uchun public_id DB’da saqlash kerak bo‘lsa, yangi ustun qo‘shish mumkin
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
@@ -75,9 +85,12 @@ def update_product(
     if sell_price is not None: product.sell_price = sell_price
     if stock is not None: product.stock = stock
     if status: product.status = status
-    
+
     if image:
-        product.image = save_upload_file(image)
+        # Eski rasmni o'chirish faqat public_id bilan mumkin bo‘ladi
+        # agar public_id qo‘shsang, delete_from_cloudinary(product.image_public_id) ishlatiladi
+        upload_result = upload_to_cloudinary(image.file)
+        product.image = upload_result["url"]
 
     db.commit()
     db.refresh(product)
@@ -86,8 +99,6 @@ def update_product(
 # GET (List)
 @router.get("/", response_model=List[ProductListRead])
 def get_products(db: Session = Depends(get_db)):
-    # Userga faqat aktiv va omborda bor mahsulotlarni ko'rsatsa maqsadga muvofiq
-    # Lekin "stock=0" bo'lsa ham ko'rsatish kerak bo'lsa filter qilmang
     return db.query(Product).filter(Product.status == "active").all()
 
 # GET (Detail)
@@ -98,11 +109,17 @@ def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
     return product
 
+# DELETE
 @router.delete("/{product_id}")
 def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Topilmadi")
+    
+    # Cloudinary rasmni o'chirish, agar public_id qo‘shilgan bo‘lsa
+    # delete_from_cloudinary(product.image_public_id)
+    
+    # DB status
     product.status = "deleted"
     db.commit()
     return {"message": "O'chirildi"}

@@ -32,17 +32,15 @@ class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
-    
-    # YANGI: Narxlar va Ombor
-    buy_price = Column(Float, default=0.0)  # Olish narxi (Tannarx)
-    sell_price = Column(Float, default=0.0) # Sotish narxi
-    stock = Column(Integer, default=0)      # Ombordagi soni
-    
+    buy_price = Column(Float, default=0.0)
+    sell_price = Column(Float, default=0.0)
+    stock = Column(Integer, default=0)
     image = Column(String, nullable=True)
+    image_public_id = Column(String, nullable=True)  # Cloudinary
     status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     order_items = relationship("OrderItem", back_populates="product")
+    
 
 class Order(Base):
     __tablename__ = "orders"
