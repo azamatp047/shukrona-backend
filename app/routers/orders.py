@@ -2,17 +2,16 @@ from typing import List
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal
-from app.models import Order, User, Product, Courier, Transaction
+from app.models import Order, User, Product, Courier, Transaction, OrderItem
 from app.schemas.order import (
     OrderCreate, 
     OrderRead, 
     OrderAssign, 
-    OrderAccept, 
-    OrderStatusUpdate,
-    OrderWithDetails
+    OrderAccept,
+    OrderItemRead
 )
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -24,35 +23,119 @@ def get_db():
     finally:
         db.close()
 
+# -------------------------------------------------------------------
+# YORDAMCHI FUNKSIYA: Javobni chiroyli formatlash uchun
+# -------------------------------------------------------------------
+def format_order_response(order: Order) -> OrderRead:
+    # 1. Order ichidagi mahsulotlarni formatlash
+    items_data = []
+    for item in order.items:
+        product_name = item.product.name if item.product else "O'chirilgan mahsulot"
+        items_data.append(OrderItemRead(
+            product_id=item.product_id,
+            product_name=product_name,
+            quantity=item.quantity,
+            price=item.price,
+            total=item.price * item.quantity
+        ))
+        
+    # 2. Kuryer telefonini xavfsiz olish
+    c_phone = None
+    if order.courier and hasattr(order.courier, 'phone'):
+        c_phone = order.courier.phone
+
+    # 3. Asosiy javobni qaytarish
+    return OrderRead(
+        id=order.id,
+        status=order.status,
+        total_amount=order.total_amount,
+        delivery_time=order.delivery_time,
+        created_at=order.created_at,
+        
+        # User ma'lumotlari
+        user_id=order.user_id,
+        user_name=order.user.name,
+        user_phone=order.user.phone,
+        user_address=order.user.address,
+        user_telegram_id=order.user.telegram_id,
+        
+        # Courier ma'lumotlari
+        courier_id=order.courier_id,
+        courier_name=order.courier.name if order.courier else None,
+        courier_phone=c_phone,
+        
+        items=items_data
+    )
+
+# -------------------------------------------------------------------
+# ENDPOINTS
+# -------------------------------------------------------------------
+
 @router.post("/", response_model=OrderRead, status_code=201)
-def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    """Foydalanuvchi order yaratadi"""
-    # User va Product mavjudligini tekshirish
-    user = db.query(User).filter(User.id == order.user_id).first()
+def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
+    """
+    Foydalanuvchi telegram_id orqali buyurtma beradi.
+    """
+    # 1. Userni telegram_id orqali topish
+    user = db.query(User).filter(User.telegram_id == order_in.telegram_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+        raise HTTPException(
+            status_code=404, 
+            detail="Foydalanuvchi topilmadi. Iltimos, avval botdan /start bosing."
+        )
     
-    product = db.query(Product).filter(Product.id == order.product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
-    
-    # Order yaratish
-    db_order = Order(**order.model_dump(), status="created")
+    # 2. Bo'sh order yaratish (User ID bilan)
+    db_order = Order(
+        user_id=user.id,
+        status="created",
+        total_amount=0.0
+    )
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
     
-    return db_order
+    total_price = 0.0
+    
+    # 3. Mahsulotlarni orderga qo'shish
+    for item in order_in.items:
+        product = db.query(Product).filter(Product.id == item.product_id).first()
+        if not product:
+            continue # Mahsulot topilmasa tashlab ketamiz
+        
+        # OrderItem jadvaliga yozish
+        db_item = OrderItem(
+            order_id=db_order.id,
+            product_id=product.id,
+            quantity=item.quantity,
+            price=product.price
+        )
+        db.add(db_item)
+        total_price += (product.price * item.quantity)
+    
+    # 4. Umumiy narxni yangilash
+    db_order.total_amount = total_price
+    db.commit()
+    db.refresh(db_order)
+    
+    # 5. To'liq ma'lumotni qaytarish
+    return format_order_response(db_order)
 
-@router.get("/", response_model=List[OrderWithDetails])
+
+@router.get("/", response_model=List[OrderRead])
 def get_orders(
     status: str = None, 
     courier_id: int = None,
     user_id: int = None,
     db: Session = Depends(get_db)
 ):
-    """Barcha orderlarni olish (filter bilan)"""
-    query = db.query(Order)
+    """
+    Admin barcha buyurtmalarni ko'rishi uchun.
+    """
+    query = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.product),
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    )
     
     if status:
         query = query.filter(Order.status == status)
@@ -61,148 +144,82 @@ def get_orders(
     if user_id:
         query = query.filter(Order.user_id == user_id)
     
-    orders = query.all()
+    orders = query.order_by(Order.created_at.desc()).all()
     
-    # To'liq ma'lumot bilan qaytarish
-    result = []
-    for order in orders:
-        order_dict = {
-            "id": order.id,
-            "status": order.status,
-            "delivery_time": order.delivery_time,
-            "created_at": order.created_at,
-            "user": {
-                "id": order.user.id,
-                "name": order.user.name,
-                "phone": order.user.phone,
-                "address": order.user.address
-            },
-            "product": {
-                "id": order.product.id,
-                "name": order.product.name,
-                "price": order.product.price
-            },
-            "courier": {
-                "id": order.courier.id,
-                "name": order.courier.name
-            } if order.courier else None
-        }
-        result.append(order_dict)
-    
-    return result
+    return [format_order_response(o) for o in orders]
 
-@router.get("/{order_id}", response_model=OrderWithDetails)
+
+@router.get("/{order_id}", response_model=OrderRead)
 def get_order(order_id: int, db: Session = Depends(get_db)):
-    """Bitta orderni olish"""
+    """Bitta buyurtmani ID orqali olish"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Order topilmadi")
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     
-    return {
-        "id": order.id,
-        "status": order.status,
-        "delivery_time": order.delivery_time,
-        "created_at": order.created_at,
-        "user": {
-            "id": order.user.id,
-            "name": order.user.name,
-            "phone": order.user.phone,
-            "address": order.user.address
-        },
-        "product": {
-            "id": order.product.id,
-            "name": order.product.name,
-            "price": order.product.price
-        },
-        "courier": {
-            "id": order.courier.id,
-            "name": order.courier.name
-        } if order.courier else None
-    }
+    return format_order_response(order)
+
 
 @router.patch("/{order_id}/assign", response_model=OrderRead)
 def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)):
     """Admin kuryer biriktiradi"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Order topilmadi")
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     
-    # Kuryer mavjudligini tekshirish
     courier = db.query(Courier).filter(Courier.id == data.courier_id).first()
     if not courier:
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")
     
-    # Order statusini yangilash
     order.courier_id = data.courier_id
     order.status = "assigned"
     order.assigned_at = datetime.utcnow()
     
     db.commit()
     db.refresh(order)
-    
-    return order
+    return format_order_response(order)
+
 
 @router.patch("/{order_id}/accept", response_model=OrderRead)
 def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(get_db)):
-    """Kuryer orderni qabul qiladi va yetkazish vaqtini yozadi"""
+    """Kuryer buyurtmani qabul qiladi va vaqt belgilaydi"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Order topilmadi")
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     
     if order.status != "assigned":
-        raise HTTPException(status_code=400, detail="Order hali tayinlanmagan")
+        raise HTTPException(status_code=400, detail="Buyurtma hali kuryerga biriktirilmagan")
     
-    # Statusni yangilash
     order.status = "accepted"
     order.delivery_time = data.delivery_time
     order.accepted_at = datetime.utcnow()
     
     db.commit()
     db.refresh(order)
-    
-    return order
+    return format_order_response(order)
+
 
 @router.patch("/{order_id}/deliver", response_model=OrderRead)
 def deliver_order(order_id: int, db: Session = Depends(get_db)):
-    """Kuryer orderni yetkazdi (delivered tugmasi)"""
+    """Kuryer buyurtmani yetkazib berdi"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Order topilmadi")
+        raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     
     if order.status not in ["accepted", "delivering"]:
-        raise HTTPException(status_code=400, detail="Order hali qabul qilinmagan")
+        raise HTTPException(status_code=400, detail="Buyurtma hali qabul qilinmagan")
     
-    # Statusni yangilash
     order.status = "delivered"
     order.delivered_at = datetime.utcnow()
     
-    # Transaction yaratish (kirim)
+    # Kirim tranzaksiyasini yaratish
     transaction = Transaction(
         order_id=order.id,
-        amount=order.product.price,
+        amount=order.total_amount,
         type="income",
-        description=f"Order #{order.id} uchun to'lov"
+        description=f"Order #{order.id} muvaffaqiyatli yetkazildi"
     )
     db.add(transaction)
     
     db.commit()
     db.refresh(order)
-    
-    return order
-
-@router.patch("/{order_id}/status", response_model=OrderRead)
-def update_order_status(
-    order_id: int, 
-    data: OrderStatusUpdate, 
-    db: Session = Depends(get_db)
-):
-    """Order statusini yangilash (universal)"""
-    order = db.query(Order).filter(Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order topilmadi")
-    
-    order.status = data.status
-    db.commit()
-    db.refresh(order)
-    
-    return order
+    return format_order_response(order)

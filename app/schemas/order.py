@@ -1,46 +1,60 @@
 from pydantic import BaseModel
+from typing import List, Optional
 from datetime import datetime
-from typing import Optional
 
-class OrderBase(BaseModel):
-    user_id: int
+# --- KICHIK QISMLAR (Order ichidagi mahsulotlar uchun) ---
+
+class OrderItemCreate(BaseModel):
     product_id: int
+    quantity: int
 
-class OrderCreate(OrderBase):
-    pass
+class OrderItemRead(BaseModel):
+    product_id: int
+    product_name: str
+    quantity: int
+    price: float
+    total: float
 
-class OrderRead(OrderBase):
+    class Config:
+        from_attributes = True
+
+# --- ASOSIY ORDER SCHEMALARI ---
+
+# 1. Order Yaratish (Frontdan keladigan - telegram_id bilan)
+class OrderCreate(BaseModel):
+    telegram_id: str 
+    items: List[OrderItemCreate]
+
+# 2. Order ma'lumotlarini o'qish (Javob uchun)
+class OrderRead(BaseModel):
     id: int
-    courier_id: Optional[int] = None
     status: str
+    total_amount: float
     delivery_time: Optional[str] = None
     created_at: datetime
-    assigned_at: Optional[datetime] = None
-    accepted_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
+    
+    # User ma'lumotlari
+    user_id: int
+    user_name: str
+    user_phone: str
+    user_address: str
+    user_telegram_id: str
+    
+    # Courier ma'lumotlari
+    courier_id: Optional[int] = None
+    courier_name: Optional[str] = None
+    courier_phone: Optional[str] = None
+    
+    # Mahsulotlar ro'yxati
+    items: List[OrderItemRead]
 
-    model_config = {
-        "from_attributes": True
-    }
+    class Config:
+        from_attributes = True
 
+# Kuryer biriktirish uchun
 class OrderAssign(BaseModel):
     courier_id: int
 
+# Kuryer qabul qilishi uchun (vaqt bilan)
 class OrderAccept(BaseModel):
-    delivery_time: str  # "3 soat", "2 kun"
-
-class OrderStatusUpdate(BaseModel):
-    status: str  # created, assigned, accepted, delivering, delivered, completed
-
-class OrderWithDetails(BaseModel):
-    id: int
-    status: str
-    delivery_time: Optional[str] = None
-    created_at: datetime
-    user: dict  # {id, name, phone, address}
-    product: dict  # {id, name, price}
-    courier: Optional[dict] = None  # {id, name}
-
-    model_config = {
-        "from_attributes": True
-    }
+    delivery_time: str

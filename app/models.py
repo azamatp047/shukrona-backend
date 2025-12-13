@@ -19,6 +19,7 @@ class Courier(Base):
     __tablename__ = "couriers"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String)
+    phone = Column(String, nullable=True)  # Yangi qo'shildi: Kuryer telefoni
     tg_username = Column(String)
     telegram_id = Column(String, unique=True, index=True)
     status = Column(String, default="active")
@@ -35,37 +36,51 @@ class Product(Base):
     status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    orders = relationship("Order", back_populates="product")
+    # OrderItem bilan bog'lanish
+    order_items = relationship("OrderItem", back_populates="product")
 
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
     courier_id = Column(Integer, ForeignKey("couriers.id"), nullable=True)
     
     # Status: created -> assigned -> accepted -> delivering -> delivered -> completed
     status = Column(String, default="created")
     
     # Vaqt ma'lumotlari
-    delivery_time = Column(String, nullable=True)  # "3 soat", "2 kun"
+    delivery_time = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    assigned_at = Column(DateTime, nullable=True)  # Admin kuryer biriktirganda
-    accepted_at = Column(DateTime, nullable=True)  # Kuryer qabul qilganda
-    delivered_at = Column(DateTime, nullable=True)  # Yetkazilganda
+    assigned_at = Column(DateTime, nullable=True)
+    accepted_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+    
+    # Umumiy summa
+    total_amount = Column(Float, default=0.0)
     
     # Relationships
     user = relationship("User", back_populates="orders")
-    product = relationship("Product", back_populates="orders")
     courier = relationship("Courier", back_populates="orders")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     transaction = relationship("Transaction", back_populates="order", uselist=False)
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"))
+    product_id = Column(Integer, ForeignKey("products.id"))
+    quantity = Column(Integer, default=1)
+    price = Column(Float) # Sotilgan vaqtdagi narxi
+    
+    order = relationship("Order", back_populates="items")
+    product = relationship("Product", back_populates="order_items")
 
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"), unique=True)
-    amount = Column(Float)  # Mahsulot narxi
-    type = Column(String, default="income")  # income (kirim)
+    amount = Column(Float)
+    type = Column(String, default="income")
     created_at = Column(DateTime, default=datetime.utcnow)
     description = Column(Text, nullable=True)
     
@@ -76,5 +91,5 @@ class Admin(Base):
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(String, unique=True, index=True)
     username = Column(String)
-    password_hash = Column(String)  # Hash qilingan parol
+    password_hash = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
