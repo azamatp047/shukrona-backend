@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Product
-# DIQQAT: Bu yerda eski ProductRead yo'q, yangilarini chaqiramiz:
 from app.schemas.product import ProductCreate, ProductListRead, ProductDetailRead
 from app.config import UPLOAD_DIR
 from app.dependencies import require_admin
@@ -25,58 +24,43 @@ def save_upload_file(upload_file: UploadFile) -> str:
     extension = os.path.splitext(upload_file.filename)[1]
     new_filename = f"{uuid.uuid4()}{extension}"
     file_path = os.path.join(UPLOAD_DIR, new_filename)
-    
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(upload_file.file, buffer)
-    
     return f"/static/images/{new_filename}"
 
-# 1. CREATE (Faqat Admin)
+# CREATE
 @router.post("/", response_model=ProductDetailRead)
 def create_product(
     name: str = Form(...),
-    price: float = Form(...),
+    buy_price: float = Form(...),  # <-- Yangi
+    sell_price: float = Form(...), # <-- Yangi
+    stock: int = Form(...),        # <-- Yangi
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
     image_url = save_upload_file(image)
-    db_product = Product(name=name, price=price, image=image_url)
+    # price degan ustunni sell_price ga o'zgartirdik modelda
+    db_product = Product(
+        name=name, 
+        buy_price=buy_price, 
+        sell_price=sell_price, 
+        stock=stock, 
+        image=image_url
+    )
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
     return db_product
 
-# 2. GET ALL (Hamma uchun) - Faqat ID va Name qaytaradi (ListRead)
-@router.get("/", response_model=List[ProductListRead])
-def get_products(db: Session = Depends(get_db)):
-    return db.query(Product).filter(Product.status == "active").all()
-
-# 3. GET ONE BY ID (Hamma uchun) - To'liq ma'lumot (DetailRead)
-@router.get("/{product_id}", response_model=ProductDetailRead)
-def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
-    return product
-
-# 4. DELETE (Faqat Admin)
-@router.delete("/{product_id}")
-def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
-    
-    product.status = "deleted"
-    db.commit()
-    return {"message": "Mahsulot o'chirildi"}
-
-# 5. UPDATE (Faqat Admin)
+# UPDATE
 @router.put("/{product_id}", response_model=ProductDetailRead)
 def update_product(
     product_id: int,
     name: Optional[str] = Form(None),
-    price: Optional[float] = Form(None),
+    buy_price: Optional[float] = Form(None),
+    sell_price: Optional[float] = Form(None),
+    stock: Optional[int] = Form(None),
     status: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -87,7 +71,9 @@ def update_product(
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
 
     if name: product.name = name
-    if price: product.price = price
+    if buy_price is not None: product.buy_price = buy_price
+    if sell_price is not None: product.sell_price = sell_price
+    if stock is not None: product.stock = stock
     if status: product.status = status
     
     if image:
@@ -96,3 +82,27 @@ def update_product(
     db.commit()
     db.refresh(product)
     return product
+
+# GET (List)
+@router.get("/", response_model=List[ProductListRead])
+def get_products(db: Session = Depends(get_db)):
+    # Userga faqat aktiv va omborda bor mahsulotlarni ko'rsatsa maqsadga muvofiq
+    # Lekin "stock=0" bo'lsa ham ko'rsatish kerak bo'lsa filter qilmang
+    return db.query(Product).filter(Product.status == "active").all()
+
+# GET (Detail)
+@router.get("/{product_id}", response_model=ProductDetailRead)
+def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    return product
+
+@router.delete("/{product_id}")
+def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Topilmadi")
+    product.status = "deleted"
+    db.commit()
+    return {"message": "O'chirildi"}

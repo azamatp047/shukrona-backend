@@ -1,8 +1,11 @@
 from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
 
 class CourierBase(BaseModel):
     name: str
-    tg_username: str
+    phone: Optional[str] = None
+    tg_username: Optional[str] = None
     telegram_id: str
 
 class CourierCreate(CourierBase):
@@ -10,7 +13,31 @@ class CourierCreate(CourierBase):
 
 class CourierRead(CourierBase):
     id: int
+    status: str
+    created_at: datetime
 
     model_config = {
         "from_attributes": True
     }
+
+# --- TARIX VA STATISTIKA UCHUN ---
+
+class CourierOrderSummary(BaseModel):
+    order_id: int
+    total_amount: float
+    delivered_at: datetime
+    # Qaysi manzilga eltib bergani qiziq bo'lishi mumkin
+    user_address: str 
+
+    class Config:
+        from_attributes = True
+
+class CourierStats(BaseModel):
+    courier_id: int
+    courier_name: str
+    
+    total_delivered_orders: int # Nechta buyurtma yetkazdi
+    total_money_collected: float # Qancha summa yig'di (savdo)
+    
+    # Tarix ro'yxati
+    history: List[CourierOrderSummary]
