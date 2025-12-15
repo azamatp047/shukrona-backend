@@ -52,9 +52,20 @@ def format_order_response(order: Order) -> OrderRead:
         items=items_data
     )
 
+from app.utils.telegram import (
+    notify_admins_new_order, 
+    notify_courier_assigned, 
+    notify_user_courier_assigned,
+    notify_user_courier_accepted,
+    notify_user_delivered,
+    notify_admin_delivered
+)
+
+# ... (Imports qoladi)
+
 # 1. CREATE ORDER (Ombor logikasi bilan)
 @router.post("/", response_model=OrderRead, status_code=201)
-def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
+async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)): # ASYNC bo'lishi kerak
     user = db.query(User).filter(User.telegram_id == order_in.telegram_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
@@ -62,7 +73,7 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     # Order yaratamiz
     db_order = Order(
         user_id=user.id,
-        status="kutilmoqda", # <--- Default status O'zbekcha
+        status="kutilmoqda", 
         total_amount=0.0
     )
     db.add(db_order)
@@ -76,26 +87,18 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         if not product:
             continue
         
-        # OMBOR TEKSHIRUVI
+        # OMBOR TEKSHIRUVI (soddalashtirilgan)
         if product.stock < item.quantity:
-            # Talab bo'yicha "xatolik bermasligi kerak", lekin manfiy ombor bo'lmasligi uchun
-            # biz borini beramiz yoki xato qaytaramiz.
-            # Agar 120 ta bo'lsa va 40 ta so'rasa -> beramiz.
-            # Agar 10 ta bo'lsa va 40 ta so'rasa -> 400 Xato qaytarish mantiqan to'g'ri.
-            # Lekin siz "xato bermasin" dedingiz, demak ehtimol "Buyurtma qabul qilinaversin, ombor minusga kirsin" degan ma'noda?
-            # ERP qoidasi: Minusga kirish yomon, lekin "Pre-order" sifatida minusga kiritamiz.
             pass 
 
-        # Ombordan ayiramiz
         product.stock -= item.quantity
         
-        # OrderItem ga Olish va Sotish narxini muhrlaymiz
         db_item = OrderItem(
             order_id=db_order.id,
             product_id=product.id,
             quantity=item.quantity,
-            buy_price=product.buy_price,   # <-- Tannarx
-            sell_price=product.sell_price  # <-- Sotuv narx
+            buy_price=product.buy_price,   
+            sell_price=product.sell_price  
         )
         db.add(db_item)
         total_price += (product.sell_price * item.quantity)
@@ -104,55 +107,110 @@ def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_order)
     
+    # --- NOTIFICATION START ---
+    try:
+        order_data = {
+            "id": db_order.id,
+            "user_name": user.name,
+            "user_phone": user.phone,
+            "user_address": user.address,
+            "total_amount": total_price
+        }
+        await notify_admins_new_order(order_data)
+    except Exception as e:
+        print(f"Notification Error: {e}")
+    # --- NOTIFICATION END ---
+
     return format_order_response(db_order)
 
 # 2. Assign Courier
 @router.patch("/{order_id}/assign", response_model=OrderRead)
-def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.id == order_id).first()
+async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)): # ASYNC
+    order = db.query(Order).options(joinedload(Order.user)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Topilmadi")
     
     courier = db.query(Courier).filter(Courier.id == data.courier_id).first()
     if not courier: raise HTTPException(status_code=404, detail="Kuryer yo'q")
     
     order.courier_id = data.courier_id
-    # Status o'zgarmaydi (hali ham kutilmoqda) yoki "assigned" qilmasdan to'g'ridan to'g'ri kuryer qabul qilganda o'zgartiramiz
-    # Talabda 3 ta status bor: kutilmoqda, kuryerda, yetkazildi.
-    # Admin biriktirganda hali "kuryerda" emas, kuryer "Qabul qildim" deganda o'zgaradi.
-    
     order.assigned_at = datetime.utcnow()
     db.commit()
     db.refresh(order)
+    
+    # --- NOTIFICATION START ---
+    try:
+        # Kuryerga xabar
+        order_data = {
+            "id": order.id,
+            "user_address": order.user.address,
+            "user_phone": order.user.phone
+        }
+        if courier.telegram_id:
+            await notify_courier_assigned(courier.telegram_id, order_data)
+        
+        # Userga xabar (Admin ko'rdi)
+        if order.user.telegram_id:
+            await notify_user_courier_assigned(order.user.telegram_id, order.id)
+            
+    except Exception as e:
+        print(f"Notification Error: {e}")
+    # --- NOTIFICATION END ---
+    
     return format_order_response(order)
 
 # 3. Accept (Kuryerda)
 @router.patch("/{order_id}/accept", response_model=OrderRead)
-def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.id == order_id).first()
+async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(get_db)): # ASYNC
+    order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Topilmadi")
     
-    order.status = "kuryerda" # <--- Status o'zgardi
+    order.status = "kuryerda" 
     order.delivery_time = data.delivery_time
     order.accepted_at = datetime.utcnow()
     
     db.commit()
     db.refresh(order)
+    
+    # --- NOTIFICATION START ---
+    try:
+        if order.user.telegram_id:
+            c_name = order.courier.name if order.courier else "Kuryer"
+            await notify_user_courier_accepted(
+                order.user.telegram_id, 
+                order.id, 
+                data.delivery_time, 
+                c_name
+            )
+    except Exception as e:
+        print(f"Notification Error: {e}")
+    # --- NOTIFICATION END ---
+
     return format_order_response(order)
 
 # 4. Deliver (Yetkazildi)
 @router.patch("/{order_id}/deliver", response_model=OrderRead)
-def deliver_order(order_id: int, db: Session = Depends(get_db)):
-    order = db.query(Order).filter(Order.id == order_id).first()
+async def deliver_order(order_id: int, db: Session = Depends(get_db)): # ASYNC
+    order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Topilmadi")
     
-    order.status = "yetkazildi" # <--- Status yakunlandi
+    order.status = "yetkazildi" 
     order.delivered_at = datetime.utcnow()
-    
-    # Eslatma: Transaction jadvali endi shart emas, chunki Order uzi hamma info ni saqlaydi
-    # lekin xohlasangiz qoldirishingiz mumkin. Men soddalik uchun OrderItemlardan hisoblashni afzal ko'raman.
     
     db.commit()
     db.refresh(order)
+
+    # --- NOTIFICATION START ---
+    try:
+        if order.user.telegram_id:
+            await notify_user_delivered(order.user.telegram_id, order.id)
+        
+        c_name = order.courier.name if order.courier else "Kuryer"
+        await notify_admin_delivered(order.id, c_name)
+
+    except Exception as e:
+        print(f"Notification Error: {e}")
+    # --- NOTIFICATION END ---
+    
     return format_order_response(order)
 
 # Admin uchun GET

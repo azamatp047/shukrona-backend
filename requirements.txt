@@ -6,3 +6,5 @@ psycopg2-binary
 pydantic
 cloudinary
 python-multipart
+httpx
+python-telegram-bot
