@@ -90,7 +90,8 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     db_order = Order(
         user_id=user.id,
         status="kutilmoqda", 
-        total_amount=0.0
+        total_amount=0.0,
+        delivery_time=order_in.delivery_time
     )
     db.add(db_order)
     db.commit()

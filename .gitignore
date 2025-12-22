@@ -94,3 +94,12 @@ dmypy.json
 # Railway
 .railway/
 run.txt
+
+
+# cache files
+bot_admin.py
+bot_courier.py
+bot_user.py
+test_system.py
+verify_changes.py
+verify_rating.py

@@ -25,6 +25,7 @@ class OrderItemRead(BaseModel):
 class OrderCreate(BaseModel):
     telegram_id: str 
     items: List[OrderItemCreate]
+    delivery_time: Optional[str] = None
 
 # 2. Order ma'lumotlarini o'qish (Javob uchun)
 class OrderRead(BaseModel):
