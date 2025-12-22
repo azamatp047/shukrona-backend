@@ -7,4 +7,4 @@ pydantic
 cloudinary
 python-multipart
 httpx
-python-telegram-bot
+python-telegram-bot==20.7
