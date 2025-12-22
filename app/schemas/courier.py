@@ -26,8 +26,9 @@ class CourierOrderSummary(BaseModel):
     order_id: int
     total_amount: float
     delivered_at: datetime
-    # Qaysi manzilga eltib bergani qiziq bo'lishi mumkin
-    user_address: str 
+    user_address: str
+    rating: Optional[int] = None
+    rating_comment: Optional[str] = None 
 
     class Config:
         from_attributes = True
@@ -38,6 +39,7 @@ class CourierStats(BaseModel):
     
     total_delivered_orders: int # Nechta buyurtma yetkazdi
     total_money_collected: float # Qancha summa yig'di (savdo)
+    average_rating: float = 0.0 # O'rtacha baho
     
     # Tarix ro'yxati
     history: List[CourierOrderSummary]

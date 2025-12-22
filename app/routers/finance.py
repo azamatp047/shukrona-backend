@@ -21,13 +21,19 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/stats", response_model=ProfitStats)
+@router.get("/stats", response_model=ProfitStats, summary="Moliyaviy hisobot va statistika")
 def get_analytics(
     start_date: date = None,
     end_date: date = None,
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Kompaniyaning umumiy moliyaviy holati.**
+    
+    - **start_date**, **end_date**: Filtrlash uchun sanalar.
+    - Sof foyda, Yalpi daromad, Xarajatlar va Mahsulotlar kesimida statistika.
+    """
     # 1. Yetkazilgan buyurtmalarning ichidagi narsalarni olamiz
     query = db.query(OrderItem).join(Order).filter(Order.status == "yetkazildi")
     
@@ -115,12 +121,17 @@ def get_analytics(
         products_breakdown=breakdown_list # <-- Mana bu yangi qo'shilgan batafsil ro'yxat
     )
 
-@router.post("/pay-salary", response_model=SalaryPaymentRead)
+@router.post("/pay-salary", response_model=SalaryPaymentRead, summary="Kuryerga oylik to'lash")
 def pay_courier_salary(
     data: SalaryCalculateRequest,
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Kuryerning ish haqqini hisoblash va to'lash.**
+    
+    - Belgilangan sanalar oralig'idagi savdo summasining foizi hisoblanadi.
+    """
     courier = db.query(Courier).filter(Courier.id == data.courier_id).first()
     if not courier:
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")
@@ -153,18 +164,26 @@ def pay_courier_salary(
     payment.courier_name = courier.name 
     return payment
 
-@router.post("/expenses", response_model=ExpenseRead)
+@router.post("/expenses", response_model=ExpenseRead, summary="Yangi xarajat qo'shish")
 def create_expense(
     data: ExpenseCreate,
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Qo'shimcha xarajatlarni kiritish.**
+    
+    - Masalan: Arenda, Kommunal, Internet va boshqalar.
+    """
     expense = Expense(**data.model_dump())
     db.add(expense)
     db.commit()
     db.refresh(expense)
     return expense
 
-@router.get("/expenses", response_model=List[ExpenseRead])
+@router.get("/expenses", response_model=List[ExpenseRead], summary="Barcha xarajatlar ro'yxati")
 def get_expenses(db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Tizimga kiritilgan barcha xarajatlar.**
+    """
     return db.query(Expense).all()

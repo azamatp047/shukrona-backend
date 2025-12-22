@@ -10,9 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Tokenlar
-ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
-COURIER_BOT_TOKEN = os.getenv("COURIER_BOT_TOKEN")
-USER_BOT_TOKEN = os.getenv("USER_BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Admin IDs (ro'yxat sifatida)
 try:
@@ -70,7 +68,7 @@ async def notify_admins_new_order(order_data: dict):
     }
 
     for admin_id in ADMIN_IDS:
-        await send_telegram_message(ADMIN_BOT_TOKEN, admin_id, msg, reply_markup=kb)
+        await send_telegram_message(BOT_TOKEN, admin_id, msg, reply_markup=kb)
 
 async def notify_courier_assigned(courier_telegram_id: str, order_data: dict):
     """
@@ -89,14 +87,14 @@ async def notify_courier_assigned(courier_telegram_id: str, order_data: dict):
         ]]
     }
     
-    await send_telegram_message(COURIER_BOT_TOKEN, courier_telegram_id, msg, reply_markup=kb)
+    await send_telegram_message(BOT_TOKEN, courier_telegram_id, msg, reply_markup=kb)
 
 async def notify_user_courier_assigned(user_telegram_id: str, order_id: int):
     """
     Mijozga: Buyurtmangiz admin tomonidan ko'rildi va kuryerga berildi (lekin hali kuryer qabul qilmadi).
     """
     msg = f"ℹ️ <b>Buyurtma #{order_id}</b> admin tomonidan tasdiqlandi va kuryer qidirilmoqda."
-    await send_telegram_message(USER_BOT_TOKEN, user_telegram_id, msg)
+    await send_telegram_message(BOT_TOKEN, user_telegram_id, msg)
 
 async def notify_user_courier_accepted(user_telegram_id: str, order_id: int, delivery_time: str, courier_info: str = None):
     """
@@ -108,14 +106,14 @@ async def notify_user_courier_accepted(user_telegram_id: str, order_id: int, del
         f"⏳ Yetkazish vaqti: {delivery_time}{c_info}\n\n"
         f"Bizni tanlaganingiz uchun rahmat!"
     )
-    await send_telegram_message(USER_BOT_TOKEN, user_telegram_id, msg)
+    await send_telegram_message(BOT_TOKEN, user_telegram_id, msg)
 
 async def notify_user_delivered(user_telegram_id: str, order_id: int):
     """
     Mijozga buyurtma yetkazilganda.
     """
-    msg = f"✅ <b>Buyurtma #{order_id} yetkazib berildi!</b>\nYoqimli ishtaha! 😋"
-    await send_telegram_message(USER_BOT_TOKEN, user_telegram_id, msg)
+    msg = f"✅ <b>Buyurtma #{order_id} yetkazib berildi!</b>\n Katta rahmat! 😋"
+    await send_telegram_message(BOT_TOKEN, user_telegram_id, msg)
 
 async def notify_admin_delivered(order_id: int, courier_name: str):
     """
@@ -123,4 +121,4 @@ async def notify_admin_delivered(order_id: int, courier_name: str):
     """
     msg = f"🏁 <b>Order #{order_id} yetkazildi.</b>\n🛵 Kuryer: {courier_name}"
     for admin_id in ADMIN_IDS:
-        await send_telegram_message(ADMIN_BOT_TOKEN, admin_id, msg)
+        await send_telegram_message(BOT_TOKEN, admin_id, msg)

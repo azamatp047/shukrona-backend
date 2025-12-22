@@ -14,6 +14,7 @@ class OrderItemRead(BaseModel):
     quantity: int
     price: float
     total: float
+    is_bonus: bool = False # Yangi
 
     class Config:
         from_attributes = True
@@ -45,6 +46,10 @@ class OrderRead(BaseModel):
     courier_name: Optional[str] = None
     courier_phone: Optional[str] = None
     
+    # Rating
+    rating: Optional[int] = None
+    rating_comment: Optional[str] = None
+    
     # Mahsulotlar ro'yxati
     items: List[OrderItemRead]
 
@@ -58,3 +63,12 @@ class OrderAssign(BaseModel):
 # Kuryer qabul qilishi uchun (vaqt bilan)
 class OrderAccept(BaseModel):
     delivery_time: str
+
+# Rating berish uchun
+class OrderRate(BaseModel):
+    rating: int # 1-5
+    comment: Optional[str] = None
+
+class BonusItemCreate(BaseModel):
+    product_id: int
+    quantity: int

@@ -15,8 +15,13 @@ def get_db():
         db.close()
 
 # 1. User yaratish (Hamma qila oladi - Bot start bosganda)
-@router.post("/", response_model=UserRead)
+@router.post("/", response_model=UserRead, summary="Foydalanuvchini ro'yxatdan o'tkazish")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    **Yangi foydalanuvchi yaratish (Bot /start).**
+    
+    Agar foydalanuvchi avvaldan bor bo'lsa, eskisini qaytaradi.
+    """
     db_user = db.query(User).filter(User.telegram_id == user.telegram_id).first()
     if db_user:
         return db_user # Agar bor bo'lsa, o'shani qaytarib beramiz
@@ -28,8 +33,11 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 # 2. Get My Profile (Telegram ID orqali)
-@router.get("/me/{telegram_id}", response_model=UserRead)
+@router.get("/me/{telegram_id}", response_model=UserRead, summary="Mening profilim")
 def get_my_profile(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    **Telegram ID orqali foydalanuvchi ma'lumotlarini olish.**
+    """
     user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
@@ -41,8 +49,13 @@ def get_my_profile(telegram_id: str, db: Session = Depends(get_db)):
     return user
 
 # 3. Userni update qilish (User o'zi qiladi)
-@router.put("/me/{telegram_id}", response_model=UserRead)
+@router.put("/me/{telegram_id}", response_model=UserRead, summary="Profilni tahrirlash")
 def update_my_profile(telegram_id: str, user_update: UserUpdate, db: Session = Depends(get_db)):
+    """
+    **Foydalanuvchi o'z ma'lumotlarini o'zgartirishi.**
+    
+    - Ism, Telefon, Manzil.
+    """
     db_user = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
@@ -60,8 +73,11 @@ def update_my_profile(telegram_id: str, user_update: UserUpdate, db: Session = D
     return db_user
 
 # 4. Userni bloklash (Faqat Admin)
-@router.post("/{user_id}/block")
+@router.post("/{user_id}/block", summary="Foydalanuvchini bloklash (Admin)")
 def block_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Foydalanuvchini qora ro'yxatga olish.**
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
@@ -71,8 +87,11 @@ def block_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depe
     return {"message": f"Foydalanuvchi {user.name} bloklandi"}
 
 # 5. Userni blokdan chiqarish (Faqat Admin)
-@router.post("/{user_id}/unblock")
+@router.post("/{user_id}/unblock", summary="Foydalanuvchini blokdan chiqarish (Admin)")
 def unblock_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Foydalanuvchini faollashtirish.**
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
@@ -81,6 +100,9 @@ def unblock_user(user_id: int, db: Session = Depends(get_db), admin_id: str = De
     db.commit()
     return {"message": f"Foydalanuvchi {user.name} faollashtirildi"}
 
-@router.get("/", response_model=list[UserRead])
+@router.get("/", response_model=list[UserRead], summary="Barcha foydalanuvchilar (Admin)")
 def get_all_users(db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Tizimdagi barcha mijozlar ro'yxati.**
+    """
     return db.query(User).all()

@@ -4,8 +4,14 @@ from app.schemas.admin import AdminCreate
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-@router.post("/login")
+@router.post("/login", summary="Admin tizimiga kirish")
 def admin_login(payload: AdminCreate):
+    """
+    **Admin sifatida autentifikatsiyadan o'tish.**
+    
+    - **telegram_id**: Telegram ID (Config da bo'lishi kerak).
+    - **password**: Maxsus parol.
+    """
     # payload dan ma'lumotlarni olamiz
     telegram_id = payload.telegram_id
     password = payload.password

@@ -19,12 +19,15 @@ def get_db():
         db.close()
 
 # 1. Kuryer yaratish (Admin)
-@router.post("/", response_model=CourierRead, status_code=201)
+@router.post("/", response_model=CourierRead, status_code=201, summary="Yangi kuryer qo'shish")
 def create_courier(
     courier: CourierCreate, 
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Tizimga yangi kuryer qo'shish (faqat Admin uchun).**
+    """
     db_courier = Courier(**courier.model_dump())
     db.add(db_courier)
     db.commit()
@@ -32,14 +35,17 @@ def create_courier(
     return db_courier
 
 # 2. Barcha kuryerlar ro'yxati (Admin)
-@router.get("/", response_model=List[CourierRead])
+@router.get("/", response_model=List[CourierRead], summary="Barcha kuryerlarni ko'rish")
 def get_couriers(
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Tizimdagi barcha kuryerlar ro'yxati.**
+    """
     return db.query(Courier).all()
 
-# --- YANGI: KURYER TARIXI VA STATISTIKASI ---
+# ... (Helper methods remain same)
 
 def get_courier_statistics(db: Session, courier: Courier, start_date: date = None, end_date: date = None):
     # Faqat yetkazilgan buyurtmalarni olamiz
@@ -58,13 +64,19 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
     total_count = len(orders)
     total_money = sum(o.total_amount for o in orders)
     
+    # Rating hisoblash
+    rated_orders = [o.rating for o in orders if o.rating is not None]
+    avg_rating = sum(rated_orders) / len(rated_orders) if rated_orders else 0.0
+    
     history_list = []
     for o in orders:
         history_list.append(CourierOrderSummary(
             order_id=o.id,
             total_amount=o.total_amount,
             delivered_at=o.delivered_at,
-            user_address=o.user.address if o.user else "Noma'lum"
+            user_address=o.user.address if o.user else "Noma'lum",
+            rating=o.rating,
+            rating_comment=o.rating_comment
         ))
         
     return CourierStats(
@@ -72,17 +84,24 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
         courier_name=courier.name,
         total_delivered_orders=total_count,
         total_money_collected=total_money,
+        average_rating=round(avg_rating, 1),
         history=history_list
     )
 
 # 3. Kuryer o'z tarixini ko'rishi (Telegram ID orqali)
-@router.get("/me/history", response_model=CourierStats)
+@router.get("/me/history", response_model=CourierStats, summary="Kuryer o'z statistikasini ko'rishi")
 def get_my_history(
     telegram_id: str, 
     start_date: date = None,
     end_date: date = None,
     db: Session = Depends(get_db)
 ):
+    """
+    **Kuryerning shaxsiy statistikasi va tarixi.**
+    
+    - **average_rating**: O'rtacha reyting.
+    - **history**: Bajarilgan buyurtmalar ro'yxati.
+    """
     courier = db.query(Courier).filter(Courier.telegram_id == telegram_id).first()
     if not courier:
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")
@@ -90,7 +109,7 @@ def get_my_history(
     return get_courier_statistics(db, courier, start_date, end_date)
 
 # 4. Admin birorta kuryerni tarixini ko'rishi
-@router.get("/{courier_id}/history", response_model=CourierStats)
+@router.get("/{courier_id}/history", response_model=CourierStats, summary="Kuryer statistikasi (Admin)")
 def get_courier_history_admin(
     courier_id: int,
     start_date: date = None,
@@ -98,6 +117,9 @@ def get_courier_history_admin(
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Admin istalgan kuryerning statistikasini ko'rishi mumkin.**
+    """
     courier = db.query(Courier).filter(Courier.id == courier_id).first()
     if not courier:
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")

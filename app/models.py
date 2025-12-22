@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Date
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Date, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -59,6 +59,10 @@ class Order(Base):
     
     total_amount = Column(Float, default=0.0) # Faqat sotish narxi bo'yicha summa
     
+    # Rating tizimi
+    rating = Column(Integer, nullable=True) # 1-5 yulduz
+    rating_comment = Column(Text, nullable=True) # Izoh
+    
     user = relationship("User", back_populates="orders")
     courier = relationship("Courier", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -70,6 +74,7 @@ class OrderItem(Base):
     product_id = Column(Integer, ForeignKey("products.id"))
     
     quantity = Column(Integer, default=1)
+    is_bonus = Column(Boolean, default=False) # Bonus (tekin) mahsulotmi?
     
     # Sotilgan vaqtdagi narxlar (Tarix uchun muhim)
     buy_price = Column(Float, default=0.0)  # O'sha paytdagi tannarx

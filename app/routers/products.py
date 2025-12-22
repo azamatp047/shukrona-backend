@@ -39,7 +39,7 @@ def delete_from_cloudinary(public_id: Optional[str]):
         cloud_destroy(public_id)
 
 # CREATE
-@router.post("/", response_model=ProductDetailRead)
+@router.post("/", response_model=ProductDetailRead, summary="Yangi mahsulot qo'shish")
 def create_product(
     name: str = Form(...),
     buy_price: float = Form(...),
@@ -49,6 +49,15 @@ def create_product(
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Omborga yangi mahsulot qo'shish (Admin).**
+    
+    - **name**: Mahsulot nomi.
+    - **buy_price**: Sotib olingan narxi (tannarx).
+    - **sell_price**: Sotuv narxi.
+    - **stock**: Ombor qoldig'i (dona).
+    - **image**: Rasm fayli (Cloudinary ga yuklanadi).
+    """
     upload_result = upload_to_cloudinary(image.file)
     db_product = Product(
         name=name,
@@ -64,7 +73,7 @@ def create_product(
     return db_product
 
 # UPDATE
-@router.put("/{product_id}", response_model=ProductDetailRead)
+@router.put("/{product_id}", response_model=ProductDetailRead, summary="Mahsulot ma'lumotlarini tahrirlash")
 def update_product(
     product_id: int,
     name: Optional[str] = Form(None),
@@ -76,6 +85,12 @@ def update_product(
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
+    """
+    **Mahsulotni o'zgartirish (Admin).**
+    
+    - Faqat yuborilgan maydonlar o'zgaradi.
+    - Agar yangi **image** yuborilsa, eskisi o'chib yangisi yuklanadi.
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
@@ -97,21 +112,34 @@ def update_product(
     return product
 
 # GET (List)
-@router.get("/", response_model=List[ProductListRead])
+@router.get("/", response_model=List[ProductListRead], summary="Mahsulotlar ro'yxati (Katalog)")
 def get_products(db: Session = Depends(get_db)):
+    """
+    **Aktiv statusdagi barcha mahsulotlarni olish.**
+    
+    - Asosan mijozlar ilovasi uchun (rasm va narxlari bilan).
+    """
     return db.query(Product).filter(Product.status == "active").all()
 
 # GET (Detail)
-@router.get("/{product_id}", response_model=ProductDetailRead)
+@router.get("/{product_id}", response_model=ProductDetailRead, summary="Mahsulot tafsilotlari")
 def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
+    """
+    **ID orqali bitta mahsulotni ko'rish.**
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
     return product
 
 # DELETE
-@router.delete("/{product_id}")
+@router.delete("/{product_id}", summary="Mahsulotni o'chirish")
 def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Mahsulotni o'chirish (Soft delete).**
+    
+    - Bazadan o'chmaydi, faqat statusi **deleted** bo'ladi.
+    """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Topilmadi")
