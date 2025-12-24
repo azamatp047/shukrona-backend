@@ -4,7 +4,7 @@ from app.schemas.admin import AdminCreate
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-@router.post("/login", summary="Admin tizimiga kirish")
+@router.post("/login/", summary="Admin tizimiga kirish")
 def admin_login(payload: AdminCreate):
     """
     **Admin sifatida autentifikatsiyadan o'tish.**
