@@ -141,7 +141,7 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     return format_order_response(db_order)
 
 # 2. Assign Courier
-@router.patch("/{order_id}/assign", response_model=OrderRead, summary="Kuryer biriktirish (Admin)")
+@router.patch("/{order_id}/assign/", response_model=OrderRead, summary="Kuryer biriktirish (Admin)")
 async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)):
     """
     **Buyurtmani kuryerga biriktirish.**
@@ -182,7 +182,7 @@ async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends
     return format_order_response(order)
 
 # 3. Accept (Kuryerda)
-@router.patch("/{order_id}/accept", response_model=OrderRead, summary="Buyurtmani qabul qilish (Kuryer)")
+@router.patch("/{order_id}/accept/", response_model=OrderRead, summary="Buyurtmani qabul qilish (Kuryer)")
 async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(get_db)):
     """
     **Kuryer buyurtmani qabul qilishi.**
@@ -218,7 +218,7 @@ async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(g
     return format_order_response(order)
 
 # 4. Deliver (Yetkazildi)
-@router.patch("/{order_id}/deliver", response_model=OrderRead, summary="Buyurtmani yetkazildi deb belgilash")
+@router.patch("/{order_id}/deliver/", response_model=OrderRead, summary="Buyurtmani yetkazildi deb belgilash")
 async def deliver_order(order_id: int, db: Session = Depends(get_db)):
     """
     **Buyurtma yetkazib berilganda ishlatiladi.**
@@ -254,7 +254,7 @@ async def deliver_order(order_id: int, db: Session = Depends(get_db)):
     return format_order_response(order)
 
 # 4.5. Rate Order (Baho berish)
-@router.post("/{order_id}/rate", response_model=OrderRead, summary="Buyurtmani baholash")
+@router.post("/{order_id}/rate/", response_model=OrderRead, summary="Buyurtmani baholash")
 async def rate_order(order_id: int, data: OrderRate, db: Session = Depends(get_db)):
     """
     **Mijoz tomonidan kuryer xizmatini baholash.**
@@ -283,7 +283,7 @@ async def rate_order(order_id: int, data: OrderRate, db: Session = Depends(get_d
     return format_order_response(order)
 
 # 4.6 Get One Order
-@router.get("/{order_id}", response_model=OrderRead, summary="Bitta buyurtma haqida ma'lumot")
+@router.get("/{order_id}/", response_model=OrderRead, summary="Bitta buyurtma haqida ma'lumot")
 def get_order_by_id(order_id: int, db: Session = Depends(get_db)):
     """
     **ID orqali buyurtma tafsilotlarini olish.**
@@ -301,10 +301,8 @@ def get_order_by_id(order_id: int, db: Session = Depends(get_db)):
         
     return format_order_response(order)
 
-    return format_order_response(order)
-
 # 4.7 Add Bonus Items
-@router.post("/{order_id}/bonus", response_model=OrderRead, summary="Bonus (tekin) mahsulot qo'shish")
+@router.post("/{order_id}/bonus/", response_model=OrderRead, summary="Bonus (tekin) mahsulot qo'shish")
 async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Session = Depends(get_db)):
     """
     **Kuryer tomonidan buyurtmaga bonus qo'shish.**

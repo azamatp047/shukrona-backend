@@ -89,7 +89,7 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
     )
 
 # 3. Kuryer o'z tarixini ko'rishi (Telegram ID orqali)
-@router.get("/me/history", response_model=CourierStats, summary="Kuryer o'z statistikasini ko'rishi")
+@router.get("/me/history/", response_model=CourierStats, summary="Kuryer o'z statistikasini ko'rishi")
 def get_my_history(
     telegram_id: str, 
     start_date: date = None,
@@ -109,7 +109,7 @@ def get_my_history(
     return get_courier_statistics(db, courier, start_date, end_date)
 
 # 4. Admin birorta kuryerni tarixini ko'rishi
-@router.get("/{courier_id}/history", response_model=CourierStats, summary="Kuryer statistikasi (Admin)")
+@router.get("/{courier_id}/history/", response_model=CourierStats, summary="Kuryer statistikasi (Admin)")
 def get_courier_history_admin(
     courier_id: int,
     start_date: date = None,

@@ -21,7 +21,7 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/stats", response_model=ProfitStats, summary="Moliyaviy hisobot va statistika")
+@router.get("/stats/", response_model=ProfitStats, summary="Moliyaviy hisobot va statistika")
 def get_analytics(
     start_date: date = None,
     end_date: date = None,
@@ -121,7 +121,7 @@ def get_analytics(
         products_breakdown=breakdown_list # <-- Mana bu yangi qo'shilgan batafsil ro'yxat
     )
 
-@router.post("/pay-salary", response_model=SalaryPaymentRead, summary="Kuryerga oylik to'lash")
+@router.post("/pay-salary/", response_model=SalaryPaymentRead, summary="Kuryerga oylik to'lash")
 def pay_courier_salary(
     data: SalaryCalculateRequest,
     db: Session = Depends(get_db),
@@ -164,7 +164,7 @@ def pay_courier_salary(
     payment.courier_name = courier.name 
     return payment
 
-@router.post("/expenses", response_model=ExpenseRead, summary="Yangi xarajat qo'shish")
+@router.post("/expenses/", response_model=ExpenseRead, summary="Yangi xarajat qo'shish")
 def create_expense(
     data: ExpenseCreate,
     db: Session = Depends(get_db),
@@ -181,7 +181,7 @@ def create_expense(
     db.refresh(expense)
     return expense
 
-@router.get("/expenses", response_model=List[ExpenseRead], summary="Barcha xarajatlar ro'yxati")
+@router.get("/expenses/", response_model=List[ExpenseRead], summary="Barcha xarajatlar ro'yxati")
 def get_expenses(db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     """
     **Tizimga kiritilgan barcha xarajatlar.**

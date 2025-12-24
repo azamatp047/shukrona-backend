@@ -73,7 +73,7 @@ def create_product(
     return db_product
 
 # UPDATE
-@router.put("/{product_id}", response_model=ProductDetailRead, summary="Mahsulot ma'lumotlarini tahrirlash")
+@router.put("/{product_id}/", response_model=ProductDetailRead, summary="Mahsulot ma'lumotlarini tahrirlash")
 def update_product(
     product_id: int,
     name: Optional[str] = Form(None),
@@ -122,7 +122,7 @@ def get_products(db: Session = Depends(get_db)):
     return db.query(Product).filter(Product.status == "active").all()
 
 # GET (Detail)
-@router.get("/{product_id}", response_model=ProductDetailRead, summary="Mahsulot tafsilotlari")
+@router.get("/{product_id}/", response_model=ProductDetailRead, summary="Mahsulot tafsilotlari")
 def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
     """
     **ID orqali bitta mahsulotni ko'rish.**
@@ -133,7 +133,7 @@ def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
     return product
 
 # DELETE
-@router.delete("/{product_id}", summary="Mahsulotni o'chirish")
+@router.delete("/{product_id}/", summary="Mahsulotni o'chirish")
 def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     """
     **Mahsulotni o'chirish (Soft delete).**

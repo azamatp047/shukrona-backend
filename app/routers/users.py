@@ -33,7 +33,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 # 2. Get My Profile (Telegram ID orqali)
-@router.get("/me/{telegram_id}", response_model=UserRead, summary="Mening profilim")
+@router.get("/me/{telegram_id}/", response_model=UserRead, summary="Mening profilim")
 def get_my_profile(telegram_id: str, db: Session = Depends(get_db)):
     """
     **Telegram ID orqali foydalanuvchi ma'lumotlarini olish.**
@@ -49,7 +49,7 @@ def get_my_profile(telegram_id: str, db: Session = Depends(get_db)):
     return user
 
 # 3. Userni update qilish (User o'zi qiladi)
-@router.put("/me/{telegram_id}", response_model=UserRead, summary="Profilni tahrirlash")
+@router.put("/me/{telegram_id}/", response_model=UserRead, summary="Profilni tahrirlash")
 def update_my_profile(telegram_id: str, user_update: UserUpdate, db: Session = Depends(get_db)):
     """
     **Foydalanuvchi o'z ma'lumotlarini o'zgartirishi.**
@@ -73,7 +73,7 @@ def update_my_profile(telegram_id: str, user_update: UserUpdate, db: Session = D
     return db_user
 
 # 4. Userni bloklash (Faqat Admin)
-@router.post("/{user_id}/block", summary="Foydalanuvchini bloklash (Admin)")
+@router.post("/{user_id}/block/", summary="Foydalanuvchini bloklash (Admin)")
 def block_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     """
     **Foydalanuvchini qora ro'yxatga olish.**
@@ -87,7 +87,7 @@ def block_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depe
     return {"message": f"Foydalanuvchi {user.name} bloklandi"}
 
 # 5. Userni blokdan chiqarish (Faqat Admin)
-@router.post("/{user_id}/unblock", summary="Foydalanuvchini blokdan chiqarish (Admin)")
+@router.post("/{user_id}/unblock/", summary="Foydalanuvchini blokdan chiqarish (Admin)")
 def unblock_user(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     """
     **Foydalanuvchini faollashtirish.**
