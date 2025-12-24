@@ -12,10 +12,9 @@ POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432") # Portni string qilib olgan m
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 ADMIN_TELEGRAM_IDS = os.getenv("ADMIN_TELEGRAM_IDS")
 
-# ---------------- Cloudinary config ----------------
-CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
-CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
-CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+# ---------------- Google Drive config ----------------
+GOOGLE_SERVICE_ACCOUNT_FILE = "google_credentials.json"
+GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
 
 # TUZATILGAN QISM:
 if ADMIN_TELEGRAM_IDS:
