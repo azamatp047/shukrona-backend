@@ -55,7 +55,7 @@ def create_product(
         raise HTTPException(status_code=500, detail=f"Database xatosi: {str(e)}")
 
 # UPDATE
-@router.put("/{product_id}/", response_model=ProductAdminRead, summary="Mahsulot ma'lumotlarini tahrirlash")
+@router.put("/admin/{product_id}/", response_model=ProductAdminRead, summary="Mahsulot ma'lumotlarini tahrirlash")
 def update_product(
     product_id: int,
     name: Optional[str] = Form(None),
@@ -90,7 +90,7 @@ def update_product(
     return product
 
 # STOCK ADD
-@router.post("/{product_id}/add-stock", response_model=ProductAdminRead, summary="Omborga tovar qo'shish (Prihod)")
+@router.post("/{product_id}/add-stock/", response_model=ProductAdminRead, summary="Omborga tovar qo'shish (Prihod)")
 def add_product_stock(
     product_id: int,
     stock_update: ProductStockUpdate,
@@ -163,7 +163,7 @@ def get_admin_product_by_id(
     return product
 
 # DELETE
-@router.delete("/{product_id}/", summary="Mahsulotni o'chirish")
+@router.delete("/admin/{product_id}/", summary="Mahsulotni o'chirish")
 def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
     """
     **Mahsulotni o'chirish (Soft delete).**
