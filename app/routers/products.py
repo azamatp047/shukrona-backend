@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Product
-from app.schemas.product import ProductListRead, ProductDetailRead
+from app.schemas.product import ProductUserRead, ProductAdminRead
 from app.dependencies import require_admin
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -18,7 +18,7 @@ def get_db():
         db.close()
 
 # CREATE
-@router.post("/", response_model=ProductDetailRead, summary="Yangi mahsulot qo'shish")
+@router.post("/", response_model=ProductAdminRead, summary="Yangi mahsulot qo'shish")
 def create_product(
     name: str = Form(...),
     buy_price: float = Form(...),
@@ -55,7 +55,7 @@ def create_product(
         raise HTTPException(status_code=500, detail=f"Database xatosi: {str(e)}")
 
 # UPDATE
-@router.put("/{product_id}/", response_model=ProductDetailRead, summary="Mahsulot ma'lumotlarini tahrirlash")
+@router.put("/{product_id}/", response_model=ProductAdminRead, summary="Mahsulot ma'lumotlarini tahrirlash")
 def update_product(
     product_id: int,
     name: Optional[str] = Form(None),
@@ -90,20 +90,46 @@ def update_product(
     return product
 
 # GET (List)
-@router.get("/", response_model=List[ProductListRead], summary="Mahsulotlar ro'yxati (Katalog)")
+@router.get("/", response_model=List[ProductUserRead], summary="Mahsulotlar ro'yxati (Katalog)")
 def get_products(db: Session = Depends(get_db)):
     """
-    **Aktiv statusdagi barcha mahsulotlarni olish.**
+    **Aktiv statusdagi barcha mahsulotlarni olish (Faqat Userlar uchun).**
     
-    - Asosan mijozlar ilovasi uchun (rasm va narxlari bilan).
+    - Faqat `name`, `price`, `image` qaytadi.
     """
     return db.query(Product).filter(Product.status == "active").all()
 
+# GET (Admin List)
+@router.get("/admin/", response_model=List[ProductAdminRead], summary="Mahsulotlar ro'yxati (Admin)")
+def get_admin_products(
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Barcha mahsulotlarni to'liq ma'lumotlari bilan olish (Admin).**
+    """
+    return db.query(Product).all()
+
 # GET (Detail)
-@router.get("/{product_id}/", response_model=ProductDetailRead, summary="Mahsulot tafsilotlari")
+@router.get("/{product_id}/", response_model=ProductUserRead, summary="Mahsulot tafsilotlari")
 def get_product_by_id(product_id: int, db: Session = Depends(get_db)):
     """
-    **ID orqali bitta mahsulotni ko'rish.**
+    **ID orqali bitta mahsulotni ko'rish (User).**
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    return product
+
+# GET (Admin Detail)
+@router.get("/admin/{product_id}/", response_model=ProductAdminRead, summary="Mahsulot tafsilotlari (Admin)")
+def get_admin_product_by_id(
+    product_id: int, 
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **ID orqali bitta mahsulotni to'liq ko'rish (Admin).**
     """
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:

@@ -18,16 +18,17 @@ class ProductUpdate(BaseModel):
     stock: Optional[int] = None
     status: Optional[str] = None
 
-class ProductListRead(BaseModel):
+class ProductUserRead(BaseModel):
     id: int
     name: str
-    stock: int # User bilsin qancha qolganini
+    sell_price: float
+    image: Optional[str] = None
 
     model_config = {
         "from_attributes": True
     }
 
-class ProductDetailRead(ProductBase):
+class ProductAdminRead(ProductBase):
     id: int
     image: Optional[str] = None
     status: str
