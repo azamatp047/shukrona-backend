@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class ProductBase(BaseModel):
     name: str
@@ -36,3 +36,9 @@ class ProductAdminRead(ProductBase):
     model_config = {
         "from_attributes": True
     }
+
+
+
+class ProductStockUpdate(BaseModel):
+    quantity: int
+

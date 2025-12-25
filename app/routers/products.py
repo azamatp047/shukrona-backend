@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import Product
-from app.schemas.product import ProductUserRead, ProductAdminRead
+from app.schemas.product import ProductUserRead, ProductAdminRead, ProductStockUpdate
 from app.dependencies import require_admin
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -89,6 +89,32 @@ def update_product(
     db.refresh(product)
     return product
 
+# STOCK ADD
+@router.post("/{product_id}/add-stock", response_model=ProductAdminRead, summary="Omborga tovar qo'shish (Prihod)")
+def add_product_stock(
+    product_id: int,
+    stock_update: ProductStockUpdate,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Omborga tovar qo'shish.**
+    
+    - **quantity**: Qo'shilayotgan tovar soni.
+    - Avtomatik ravishda eski qoldiqqa qo'shiladi.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Mahsulot topilmadi")
+    
+    if stock_update.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Miqdor musbat bo'lishi kerak")
+
+    product.stock += stock_update.quantity
+    db.commit()
+    db.refresh(product)
+    return product
+
 # GET (List)
 @router.get("/", response_model=List[ProductUserRead], summary="Mahsulotlar ro'yxati (Katalog)")
 def get_products(db: Session = Depends(get_db)):
@@ -155,3 +181,5 @@ def delete_product(product_id: int, db: Session = Depends(get_db), admin_id: str
     product.status = "deleted"
     db.commit()
     return {"message": "O'chirildi"}
+
+
