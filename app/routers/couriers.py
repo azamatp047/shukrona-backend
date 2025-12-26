@@ -74,6 +74,7 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
             order_id=o.id,
             total_amount=o.total_amount,
             delivered_at=o.delivered_at,
+            user_name=o.user.name if o.user else "Noma'lum",
             user_address=o.user.address if o.user else "Noma'lum",
             rating=o.rating,
             rating_comment=o.rating_comment

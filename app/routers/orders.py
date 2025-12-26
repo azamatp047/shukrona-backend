@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import SessionLocal
 from app.models import Order, User, Product, Courier, OrderItem
 from app.schemas.order import (
-    OrderCreate, OrderRead, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate
+    OrderCreate, OrderRead, OrderList, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate
 )
 from app.dependencies import require_admin
+from app.config import MAX_USER_PENDING_ORDERS
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -42,6 +43,9 @@ def format_order_response(order: Order) -> OrderRead:
         total_amount=order.total_amount,
         delivery_time=order.delivery_time,
         created_at=order.created_at,
+        assigned_at=order.assigned_at,
+        accepted_at=order.accepted_at,
+        delivered_at=order.delivered_at,
         user_id=order.user_id,
         user_name=order.user.name,
         user_phone=order.user.phone,
@@ -53,6 +57,20 @@ def format_order_response(order: Order) -> OrderRead:
         rating=order.rating,
         rating_comment=order.rating_comment,
         items=items_data
+    )
+
+def format_order_list_response(order: Order) -> OrderList:
+    return OrderList(
+        id=order.id,
+        user_id=order.user_id,
+        courier_id=order.courier_id,
+        user_name=order.user.name,
+        user_phone=order.user.phone,
+        courier_name=order.courier.name if order.courier else None,
+        status=order.status,
+        rating=order.rating,
+        rating_comment=order.rating_comment,
+        total_amount=order.total_amount
     )
 
 from app.utils.telegram import (
@@ -85,6 +103,18 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.telegram_id == order_in.telegram_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    # LIMIT TEKSHIRUVI: Foydalanuvchining faol buyurtmalari sonini tekshiramiz
+    active_orders_count = db.query(Order).filter(
+        Order.user_id == user.id,
+        Order.status.in_(["kutilmoqda", "kuryerda"])
+    ).count()
+    
+    if active_orders_count >= MAX_USER_PENDING_ORDERS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Sizda {active_orders_count} ta faol buyurtma bor. Yangi buyurtma berish uchun avvalgi buyurtmalaringiz yetkazilishini kuting."
+        )
     
     # Order yaratamiz
     db_order = Order(
@@ -343,20 +373,109 @@ async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Sessi
     return format_order_response(order)
 
 # Admin uchun GET
-@router.get("/", response_model=List[OrderRead])
-def get_orders(
+@router.get("/admin/", response_model=List[OrderList], summary="Barcha buyurtmalarni olish (Admin)")
+def get_orders_admin(
     status: str = None, 
-    courier_id: int = None,
-    user_id: int = None,
+    limit: int = 5, 
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Admin uchun barcha buyurtmalar ro'yxatini olish.**
+    
+    - Faqat qisqacha ma'lumot (OrderList) qaytaradi.
+    - Status bo'yicha filtrlash mumkin.
+    """
+    query = db.query(Order).options(
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    )
+    
+    # Status mapping
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "in the courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+    
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_list_response(o) for o in orders]
+
+# Kuryer uchun GET
+@router.get("/courier/", response_model=List[OrderRead], summary="Kuryerning o'z buyurtmalarini olish")
+def get_orders_courier(
+    telegram_id: str,
+    status: str = None,
+    limit: int = 5,
+    offset: int = 0,
     db: Session = Depends(get_db)
 ):
+    """
+    **Kuryerning o'ziga biriktirilgan buyurtmalarni olish.**
+    
+    - **telegram_id**: Kuryerning Telegram ID si (Majburiy).
+    - To'liq ma'lumot (OrderRead) qaytaradi.
+    """
+    courier = db.query(Courier).filter(Courier.telegram_id == telegram_id).first()
+    if not courier:
+        raise HTTPException(status_code=404, detail="Kuryer topilmadi")
+    
     query = db.query(Order).options(
         joinedload(Order.items).joinedload(OrderItem.product),
         joinedload(Order.user),
         joinedload(Order.courier)
-    )
-    if status: query = query.filter(Order.status == status)
-    if courier_id: query = query.filter(Order.courier_id == courier_id)
-    if user_id: query = query.filter(Order.user_id == user_id)
+    ).filter(Order.courier_id == courier.id)
     
-    return [format_order_response(o) for o in query.order_by(Order.created_at.desc()).all()]
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+        
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_response(o) for o in orders]
+
+# User uchun GET
+@router.get("/user/", response_model=List[OrderRead], summary="Foydalanuvchining o'z buyurtmalarini olish")
+def get_orders_user(
+    telegram_id: str,
+    status: str = None,
+    limit: int = 5,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    **Foydalanuvchining (User) o'z buyurtmalarini olish.**
+    
+    - **telegram_id**: Foydalanuvchining Telegram ID si (Majburiy).
+    - To'liq ma'lumot (OrderRead) qaytaradi.
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    query = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.product),
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    ).filter(Order.user_id == user.id)
+    
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+        
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_response(o) for o in orders]

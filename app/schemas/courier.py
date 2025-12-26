@@ -26,6 +26,7 @@ class CourierOrderSummary(BaseModel):
     order_id: int
     total_amount: float
     delivered_at: datetime
+    user_name: str # Yangi qoshildi
     user_address: str
     rating: Optional[int] = None
     rating_comment: Optional[str] = None 

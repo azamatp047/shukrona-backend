@@ -101,8 +101,36 @@ def unblock_user(user_id: int, db: Session = Depends(get_db), admin_id: str = De
     return {"message": f"Foydalanuvchi {user.name} faollashtirildi"}
 
 @router.get("/", response_model=list[UserRead], summary="Barcha foydalanuvchilar (Admin)")
-def get_all_users(db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+def get_all_users(
+    status: str = None,
+    limit: int = 5,
+    offset: int = 0,
+    db: Session = Depends(get_db), 
+    admin_id: str = Depends(require_admin)
+):
     """
     **Tizimdagi barcha mijozlar ro'yxati.**
+    
+    - **status**: active yoki blocked.
+    - **limit**: nechta qaytarish (default 5).
+    - **offset**: qanchasini o'tkazib yuborish.
     """
-    return db.query(User).all()
+    query = db.query(User)
+    if status:
+        query = query.filter(User.status == status)
+    
+    return query.offset(offset).limit(limit).all()
+
+@router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")
+def get_one_user(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **ID orqali bitta foydalanuvchi haqida to'liq ma'lumot olish.**
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    return user

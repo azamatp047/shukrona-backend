@@ -28,12 +28,30 @@ class OrderCreate(BaseModel):
     delivery_time: Optional[str] = None
 
 # 2. Order ma'lumotlarini o'qish (Javob uchun)
+class OrderList(BaseModel):
+    id: int
+    user_id: int
+    courier_id: Optional[int] = None
+    user_name: str
+    user_phone: str
+    courier_name: Optional[str] = None
+    status: str
+    rating: Optional[int] = None
+    rating_comment: Optional[str] = None
+    total_amount: float
+
+    class Config:
+        from_attributes = True
+
 class OrderRead(BaseModel):
     id: int
     status: str
     total_amount: float
     delivery_time: Optional[str] = None
     created_at: datetime
+    assigned_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
     
     # User ma'lumotlari
     user_id: int

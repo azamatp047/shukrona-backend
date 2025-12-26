@@ -28,3 +28,6 @@ UPLOAD_DIR = "static/images"
 
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+# Buyurtmalar limiti (bitta mijoz uchun kutilayotgan buyurtmalar soni)
+MAX_USER_PENDING_ORDERS = 3 # Masalan 3 tagacha kutilayotgan buyurtma bo'lishi mumkin
