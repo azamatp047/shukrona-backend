@@ -121,20 +121,6 @@ def get_all_users(
     
     return query.offset(offset).limit(limit).all()
 
-@router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")
-def get_one_user(
-    user_id: int, 
-    db: Session = Depends(get_db), 
-    admin_id: str = Depends(require_admin)
-):
-    """
-    **ID orqali bitta foydalanuvchi haqida to'liq ma'lumot olish.**
-    """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-    return user
-
 @router.get("/search/", response_model=list[UserShort], summary="Foydalanuvchilarni qidirish (Admin)")
 def search_users(
     query: str, 
@@ -150,3 +136,18 @@ def search_users(
         (User.name.ilike(f"%{query}%")) | (User.phone.ilike(f"%{query}%"))
     ).limit(10).all()
     return users
+
+@router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")
+def get_one_user(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **ID orqali bitta foydalanuvchi haqida to'liq ma'lumot olish.**
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    return user
+
