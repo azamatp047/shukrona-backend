@@ -39,6 +39,8 @@ class OrderList(BaseModel):
     rating: Optional[int] = None
     rating_comment: Optional[str] = None
     total_amount: float
+    has_bonus: bool = False # Yangi
+    bonus_description: Optional[str] = None # Masalan: "Suv (1), Non (2)"
 
     class Config:
         from_attributes = True
@@ -71,6 +73,7 @@ class OrderRead(BaseModel):
     
     # Mahsulotlar ro'yxati
     items: List[OrderItemRead]
+    bonus_items: List[OrderItemRead] = [] # Faqat bonuslar uchun alohida ro'yxat
 
     class Config:
         from_attributes = True

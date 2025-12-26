@@ -24,16 +24,21 @@ def get_db():
 # Helper function
 def format_order_response(order: Order) -> OrderRead:
     items_data = []
+    bonus_data = []
     for item in order.items:
         p_name = item.product.name if item.product else "Noma'lum"
-        items_data.append(OrderItemRead(
+        item_read = OrderItemRead(
             product_id=item.product_id,
             product_name=p_name,
             quantity=item.quantity,
             price=item.sell_price, # Sotilgan narxni ko'rsatamiz
             total=item.sell_price * item.quantity,
             is_bonus=item.is_bonus
-        ))
+        )
+        if item.is_bonus:
+            bonus_data.append(item_read)
+        else:
+            items_data.append(item_read)
     
     c_phone = order.courier.phone if (order.courier and order.courier.phone) else None
 
@@ -56,10 +61,21 @@ def format_order_response(order: Order) -> OrderRead:
         courier_phone=c_phone,
         rating=order.rating,
         rating_comment=order.rating_comment,
-        items=items_data
+        items=items_data,
+        bonus_items=bonus_data
     )
 
 def format_order_list_response(order: Order) -> OrderList:
+    bonus_list = []
+    has_bonus = False
+    for item in order.items:
+        if item.is_bonus:
+            has_bonus = True
+            p_name = item.product.name if item.product else "Noma'lum"
+            bonus_list.append(f"{p_name} ({item.quantity})")
+    
+    bonus_desc = ", ".join(bonus_list) if bonus_list else None
+
     return OrderList(
         id=order.id,
         user_id=order.user_id,
@@ -70,7 +86,9 @@ def format_order_list_response(order: Order) -> OrderList:
         status=order.status,
         rating=order.rating,
         rating_comment=order.rating_comment,
-        total_amount=order.total_amount
+        total_amount=order.total_amount,
+        has_bonus=has_bonus,
+        bonus_description=bonus_desc
     )
 
 from app.utils.telegram import (
