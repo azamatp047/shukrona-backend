@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import User
-from app.schemas.user import UserCreate, UserRead, UserUpdate, UserShort
+from app.schemas.user import UserCreate, UserRead, UserUpdate, UserShort, UserStats
 from app.dependencies import require_admin # Admin tekshiruvi
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -121,7 +121,7 @@ def get_all_users(
     
     return query.offset(offset).limit(limit).all()
 
-@router.get("/search/", response_model=list[UserShort], summary="Foydalanuvchilarni qidirish (Admin)")
+@router.get("/search/", response_model=list[UserRead], summary="Foydalanuvchilarni qidirish (Admin)")
 def search_users(
     query: str, 
     db: Session = Depends(get_db), 
@@ -130,12 +130,35 @@ def search_users(
     """
     **Foydalanuvchilarni ismi yoki telefoni orqali qidirish.**
     
-    Faqat {id, name} qaytaradi.
+    Barcha user ma'lumotlarini qaytaradi.
     """
     users = db.query(User).filter(
         (User.name.ilike(f"%{query}%")) | (User.phone.ilike(f"%{query}%"))
     ).limit(10).all()
     return users
+
+@router.get("/stats/", response_model=UserStats, summary="Foydalanuvchilar statistikasi (Admin)")
+def get_user_stats(
+    db: Session = Depends(get_db), 
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Foydalanuvchilar soni haqida ma'lumot olish.**
+    
+    Quyidagilarni qaytaradi:
+    - total_count: Jami
+    - active_count: Faol
+    - blocked_count: Bloklangan
+    """
+    total = db.query(User).count()
+    active = db.query(User).filter(User.status == "active").count()
+    blocked = db.query(User).filter(User.status == "blocked").count()
+    
+    return UserStats(
+        total_count=total,
+        active_count=active,
+        blocked_count=blocked
+    )
 
 @router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")
 def get_one_user(

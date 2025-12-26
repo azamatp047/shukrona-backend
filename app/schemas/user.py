@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class UserBase(BaseModel):
     name: str
@@ -29,3 +29,15 @@ class UserShort(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserStats(BaseModel):
+    total_count: int
+    active_count: int
+    blocked_count: int
+
+class UserListResponse(BaseModel):
+    total_count: int
+    active_count: int
+    blocked_count: int
+    limit: int
+    users: List[UserRead]
