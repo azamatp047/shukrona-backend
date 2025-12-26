@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import User
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead, UserUpdate, UserShort
 from app.dependencies import require_admin # Admin tekshiruvi
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -134,3 +134,19 @@ def get_one_user(
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
     return user
+
+@router.get("/search/", response_model=list[UserShort], summary="Foydalanuvchilarni qidirish (Admin)")
+def search_users(
+    query: str, 
+    db: Session = Depends(get_db), 
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Foydalanuvchilarni ismi yoki telefoni orqali qidirish.**
+    
+    Faqat {id, name} qaytaradi.
+    """
+    users = db.query(User).filter(
+        (User.name.ilike(f"%{query}%")) | (User.phone.ilike(f"%{query}%"))
+    ).limit(10).all()
+    return users
