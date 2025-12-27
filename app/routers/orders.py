@@ -188,6 +188,114 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
 
     return format_order_response(db_order)
 
+# Admin uchun GET
+@router.get("/admin/", response_model=List[OrderList], summary="Barcha buyurtmalarni olish (Admin)")
+def get_orders_admin(
+    status: str = None, 
+    limit: int = 5, 
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Admin uchun barcha buyurtmalar ro'yxatini olish.**
+    
+    - Faqat qisqacha ma'lumot (OrderList) qaytaradi.
+    - Status bo'yicha filtrlash mumkin.
+    """
+    query = db.query(Order).options(
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    )
+    
+    # Status mapping
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "in the courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+    
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_list_response(o) for o in orders]
+
+# Kuryer uchun GET
+@router.get("/courier/", response_model=List[OrderRead], summary="Kuryerning o'z buyurtmalarini olish")
+def get_orders_courier(
+    telegram_id: str,
+    status: str = None,
+    limit: int = 5,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    **Kuryerning o'ziga biriktirilgan buyurtmalarni olish.**
+    
+    - **telegram_id**: Kuryerning Telegram ID si (Majburiy).
+    - To'liq ma'lumot (OrderRead) qaytaradi.
+    """
+    courier = db.query(Courier).filter(Courier.telegram_id == telegram_id).first()
+    if not courier:
+        raise HTTPException(status_code=404, detail="Kuryer topilmadi")
+    
+    query = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.product),
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    ).filter(Order.courier_id == courier.id)
+    
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+        
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_response(o) for o in orders]
+
+# User uchun GET
+@router.get("/user/", response_model=List[OrderRead], summary="Foydalanuvchining o'z buyurtmalarini olish")
+def get_orders_user(
+    telegram_id: str,
+    status: str = None,
+    limit: int = 5,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    **Foydalanuvchining (User) o'z buyurtmalarini olish.**
+    
+    - **telegram_id**: Foydalanuvchining Telegram ID si (Majburiy).
+    - To'liq ma'lumot (OrderRead) qaytaradi.
+    """
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    query = db.query(Order).options(
+        joinedload(Order.items).joinedload(OrderItem.product),
+        joinedload(Order.user),
+        joinedload(Order.courier)
+    ).filter(Order.user_id == user.id)
+    
+    if status:
+        status_map = {
+            "pending": "kutilmoqda",
+            "in_courier": "kuryerda",
+            "delivered": "yetkazildi"
+        }
+        db_status = status_map.get(status.lower().strip(), status)
+        query = query.filter(Order.status == db_status)
+        
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    return [format_order_response(o) for o in orders]
+
 # 2. Assign Courier
 @router.patch("/{order_id}/assign/", response_model=OrderRead, summary="Kuryer biriktirish (Admin)")
 async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)):
@@ -390,110 +498,3 @@ async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Sessi
     
     return format_order_response(order)
 
-# Admin uchun GET
-@router.get("/admin/", response_model=List[OrderList], summary="Barcha buyurtmalarni olish (Admin)")
-def get_orders_admin(
-    status: str = None, 
-    limit: int = 5, 
-    offset: int = 0,
-    db: Session = Depends(get_db),
-    admin_id: str = Depends(require_admin)
-):
-    """
-    **Admin uchun barcha buyurtmalar ro'yxatini olish.**
-    
-    - Faqat qisqacha ma'lumot (OrderList) qaytaradi.
-    - Status bo'yicha filtrlash mumkin.
-    """
-    query = db.query(Order).options(
-        joinedload(Order.user),
-        joinedload(Order.courier)
-    )
-    
-    # Status mapping
-    if status:
-        status_map = {
-            "pending": "kutilmoqda",
-            "in_courier": "kuryerda",
-            "in the courier": "kuryerda",
-            "delivered": "yetkazildi"
-        }
-        db_status = status_map.get(status.lower().strip(), status)
-        query = query.filter(Order.status == db_status)
-    
-    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
-    return [format_order_list_response(o) for o in orders]
-
-# Kuryer uchun GET
-@router.get("/courier/", response_model=List[OrderRead], summary="Kuryerning o'z buyurtmalarini olish")
-def get_orders_courier(
-    telegram_id: str,
-    status: str = None,
-    limit: int = 5,
-    offset: int = 0,
-    db: Session = Depends(get_db)
-):
-    """
-    **Kuryerning o'ziga biriktirilgan buyurtmalarni olish.**
-    
-    - **telegram_id**: Kuryerning Telegram ID si (Majburiy).
-    - To'liq ma'lumot (OrderRead) qaytaradi.
-    """
-    courier = db.query(Courier).filter(Courier.telegram_id == telegram_id).first()
-    if not courier:
-        raise HTTPException(status_code=404, detail="Kuryer topilmadi")
-    
-    query = db.query(Order).options(
-        joinedload(Order.items).joinedload(OrderItem.product),
-        joinedload(Order.user),
-        joinedload(Order.courier)
-    ).filter(Order.courier_id == courier.id)
-    
-    if status:
-        status_map = {
-            "pending": "kutilmoqda",
-            "in_courier": "kuryerda",
-            "delivered": "yetkazildi"
-        }
-        db_status = status_map.get(status.lower().strip(), status)
-        query = query.filter(Order.status == db_status)
-        
-    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
-    return [format_order_response(o) for o in orders]
-
-# User uchun GET
-@router.get("/user/", response_model=List[OrderRead], summary="Foydalanuvchining o'z buyurtmalarini olish")
-def get_orders_user(
-    telegram_id: str,
-    status: str = None,
-    limit: int = 5,
-    offset: int = 0,
-    db: Session = Depends(get_db)
-):
-    """
-    **Foydalanuvchining (User) o'z buyurtmalarini olish.**
-    
-    - **telegram_id**: Foydalanuvchining Telegram ID si (Majburiy).
-    - To'liq ma'lumot (OrderRead) qaytaradi.
-    """
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
-    
-    query = db.query(Order).options(
-        joinedload(Order.items).joinedload(OrderItem.product),
-        joinedload(Order.user),
-        joinedload(Order.courier)
-    ).filter(Order.user_id == user.id)
-    
-    if status:
-        status_map = {
-            "pending": "kutilmoqda",
-            "in_courier": "kuryerda",
-            "delivered": "yetkazildi"
-        }
-        db_status = status_map.get(status.lower().strip(), status)
-        query = query.filter(Order.status == db_status)
-        
-    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
-    return [format_order_response(o) for o in orders]
