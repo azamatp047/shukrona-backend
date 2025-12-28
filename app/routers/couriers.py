@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from app.database import SessionLocal
 from app.models import Courier, Order, User
-from app.schemas.courier import CourierCreate, CourierRead, CourierStats, CourierOrderSummary
+from app.schemas.courier import CourierCreate, CourierRead, CourierStats, CourierOrderSummary, CourierUpdate
 from app.dependencies import require_admin
 
 router = APIRouter(prefix="/couriers", tags=["Couriers"])
@@ -44,6 +44,31 @@ def get_couriers(
     **Tizimdagi barcha kuryerlar ro'yxati.**
     """
     return db.query(Courier).all()
+
+# 2.5. Kuryer ma'lumotlarini o'zgartirish (Admin)
+@router.patch("/{courier_id}/", response_model=CourierRead, summary="Kuryer ma'lumotlarini o'zgartirish (Admin)")
+def update_courier(
+    courier_id: int,
+    data: CourierUpdate,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Kuryer ma'lumotlarini tahrirlash (Admin).**
+    
+    - Faqat yuborilgan maydonlar o'zgaradi.
+    """
+    db_courier = db.query(Courier).filter(Courier.id == courier_id).first()
+    if not db_courier:
+        raise HTTPException(status_code=404, detail="Kuryer topilmadi")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_courier, key, value)
+    
+    db.commit()
+    db.refresh(db_courier)
+    return db_courier
 
 # ... (Helper methods remain same)
 

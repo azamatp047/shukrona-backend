@@ -11,6 +11,13 @@ class CourierBase(BaseModel):
 class CourierCreate(CourierBase):
     pass
 
+class CourierUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    tg_username: Optional[str] = None
+    telegram_id: Optional[str] = None
+    status: Optional[str] = None
+
 class CourierRead(CourierBase):
     id: int
     status: str
