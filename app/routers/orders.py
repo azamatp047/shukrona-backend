@@ -404,6 +404,9 @@ async def deliver_order(order_id: int, data: OrderDeliver, db: Session = Depends
     if not courier or order.courier_id != courier.id:
         raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer yetkazildi deb belgilay oladi")
 
+    if not order.is_price_locked:
+        raise HTTPException(status_code=400, detail="Buyurtmani yetkazildi deb belgilashdan avval narxni bloklash (lock-price) shart")
+
     order.status = "yetkazildi" 
     order.delivered_at = datetime.utcnow()
     
