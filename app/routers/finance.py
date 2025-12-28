@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -186,6 +186,28 @@ def pay_courier_salary(
     
     payment.courier_name = courier.name 
     return payment
+
+@router.get("/salaries/", response_model=List[SalaryPaymentRead], summary="Barcha oylik to'lovlari ro'yxati (Admin)")
+def get_salary_payments(
+    courier_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Tizimda saqlangan barcha oylik to'lovlarini ko'rish.**
+    """
+    query = db.query(SalaryPayment).options(joinedload(SalaryPayment.courier))
+    
+    if courier_id:
+        query = query.filter(SalaryPayment.courier_id == courier_id)
+        
+    payments = query.order_by(SalaryPayment.paid_at.desc()).all()
+    
+    # Kuryer ismlarini Schema uchun tayyorlaymiz
+    for p in payments:
+        p.courier_name = p.courier.name if p.courier else "O'chirilgan kuryer"
+        
+    return payments
 
 @router.delete("/salaries/{payment_id}/", summary="Oylik to'lovini o'chirish (Admin)")
 def delete_salary_payment(
