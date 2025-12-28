@@ -1,7 +1,7 @@
 from typing import List, Optional
-from datetime import datetime
-
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, date
+from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal
@@ -201,7 +201,10 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
 # Admin uchun GET
 @router.get("/admin/", response_model=List[OrderList], summary="Barcha buyurtmalarni olish (Admin)")
 def get_orders_admin(
-    status: str = None, 
+    status: Optional[str] = None, 
+    courier_id: Optional[int] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     limit: int = 5, 
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -228,6 +231,14 @@ def get_orders_admin(
         }
         db_status = status_map.get(status.lower().strip(), status)
         query = query.filter(Order.status == db_status)
+    
+    if courier_id:
+        query = query.filter(Order.courier_id == courier_id)
+        
+    if start_date:
+        query = query.filter(func.date(Order.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Order.created_at) <= end_date)
     
     orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
     return [format_order_list_response(o) for o in orders]
@@ -582,6 +593,8 @@ async def lock_order_price(order_id: int, data: OrderLock, db: Session = Depends
 def get_courier_orders_history(
     courier_id: int,
     status: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     limit: int = 10,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -601,6 +614,11 @@ def get_courier_orders_history(
     
     if status:
         query = query.filter(Order.status == status)
+        
+    if start_date:
+        query = query.filter(func.date(Order.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(Order.created_at) <= end_date)
         
     orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
     
