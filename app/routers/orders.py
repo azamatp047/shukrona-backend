@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +8,7 @@ from app.database import SessionLocal
 from app.models import Order, User, Product, Courier, OrderItem, OrderPriceHistory
 from app.schemas.order import (
     OrderCreate, OrderRead, OrderList, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate, OrderPriceUpdate,
-    OrderDeliver, OrderBonus, OrderLock
+    OrderDeliver, OrderBonus, OrderLock, OrderCourierHistory
 )
 from app.dependencies import require_admin
 from app.config import MAX_USER_PENDING_ORDERS
@@ -577,4 +577,40 @@ async def lock_order_price(order_id: int, data: OrderLock, db: Session = Depends
     db.refresh(order)
     
     return format_order_response(order)
+
+@router.get("/courier/{courier_id}/history/", response_model=List[OrderCourierHistory], summary="Kuryer buyurtmalar tarixi (Admin)")
+def get_courier_orders_history(
+    courier_id: int,
+    status: Optional[str] = None,
+    limit: int = 10,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Admin uchun kuryer buyurtmalar tarixini olish.**
+    
+    Qaytariladigan maydonlar:
+    - id
+    - user_name
+    - delivered_at
+    - rating
+    - rating_comment
+    """
+    query = db.query(Order).options(joinedload(Order.user)).filter(Order.courier_id == courier_id)
+    
+    if status:
+        query = query.filter(Order.status == status)
+        
+    orders = query.order_by(Order.created_at.desc()).offset(offset).limit(limit).all()
+    
+    return [
+        OrderCourierHistory(
+            id=o.id,
+            user_name=o.user.name if o.user else "Noma'lum",
+            delivered_at=o.delivered_at,
+            rating=o.rating,
+            rating_comment=o.rating_comment
+        ) for o in orders
+    ]
 

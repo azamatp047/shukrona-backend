@@ -116,3 +116,13 @@ class OrderPriceUpdate(BaseModel):
 
 class OrderLock(BaseModel):
     courier_telegram_id: str
+
+class OrderCourierHistory(BaseModel):
+    id: int
+    user_name: str
+    delivered_at: Optional[datetime] = None
+    rating: Optional[int] = None
+    rating_comment: Optional[str] = None
+
+    class Config:
+        from_attributes = True
