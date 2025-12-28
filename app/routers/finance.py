@@ -34,53 +34,50 @@ def get_analytics(
     - **start_date**, **end_date**: Filtrlash uchun sanalar.
     - Sof foyda, Yalpi daromad, Xarajatlar va Mahsulotlar kesimida statistika.
     """
-    # 1. Yetkazilgan buyurtmalarning ichidagi narsalarni olamiz
-    query = db.query(OrderItem).join(Order).filter(Order.status == "yetkazildi")
+    # 1. Yetkazilgan buyurtmalarni olamiz
+    query = db.query(Order).filter(Order.status == "yetkazildi")
     
     if start_date:
         query = query.filter(func.date(Order.delivered_at) >= start_date)
     if end_date:
         query = query.filter(func.date(Order.delivered_at) <= end_date)
     
-    # Mahsulot nomini olish uchun join qilamiz
-    query = query.options(joinedload(OrderItem.product))
-    items = query.all()
+    orders = query.options(joinedload(Order.items).joinedload(OrderItem.product)).all()
     
     # 2. Hisob-kitoblar uchun o'zgaruvchilar
     total_revenue = 0.0
     total_cogs = 0.0
+    sold_items_count = 0
     
     # Mahsulotlar bo'yicha guruhlash
     product_stats: Dict[int, dict] = {}
     
-    for item in items:
-        # Umumiy hisob
-        rev = item.sell_price * item.quantity
-        cog = item.buy_price * item.quantity
-        
-        total_revenue += rev
-        total_cogs += cog
-        
-        # Mahsulot kesimida hisob
-        p_id = item.product_id
-        if p_id not in product_stats:
-            p_name = item.product.name if item.product else "O'chirilgan"
-            product_stats[p_id] = {
-                "name": p_name,
-                "qty": 0,
-                "revenue": 0.0,
-                "cogs": 0.0
-            }
-        
-        product_stats[p_id]["qty"] += item.quantity
-        product_stats[p_id]["revenue"] += rev
-        product_stats[p_id]["cogs"] += cog
+    for order in orders:
+        total_revenue += order.final_total_amount
+        for item in order.items:
+            cog = item.buy_price * item.quantity
+            total_cogs += cog
+            sold_items_count += item.quantity
+            
+            # Mahsulot kesimida hisob
+            p_id = item.product_id
+            if p_id not in product_stats:
+                p_name = item.product.name if item.product else "O'chirilgan"
+                product_stats[p_id] = {
+                    "name": p_name,
+                    "qty": 0,
+                    "revenue": 0.0,
+                    "cogs": 0.0
+                }
+            
+            product_stats[p_id]["qty"] += item.quantity
+            product_stats[p_id]["revenue"] += (item.sell_price * item.quantity)
+            product_stats[p_id]["cogs"] += cog
 
     # 3. ProductPerformance ro'yxatini shakllantirish
     breakdown_list = []
     for pid, data in product_stats.items():
         gross = data["revenue"] - data["cogs"]
-        # Marja foizi (0 ga bo'lishdan saqlanamiz)
         margin = (gross / data["revenue"] * 100) if data["revenue"] > 0 else 0.0
         
         breakdown_list.append(ProductPerformance(
@@ -117,8 +114,8 @@ def get_analytics(
         total_salaries=total_salaries,
         total_expenses=total_expenses,
         net_profit=net_profit,
-        sold_items_count=sum(i.quantity for i in items),
-        products_breakdown=breakdown_list # <-- Mana bu yangi qo'shilgan batafsil ro'yxat
+        sold_items_count=sold_items_count,
+        products_breakdown=breakdown_list
     )
 
 @router.post("/pay-salary/", response_model=SalaryPaymentRead, summary="Kuryerga oylik to'lash")
@@ -146,7 +143,7 @@ def pay_courier_salary(
     if not orders:
         raise HTTPException(status_code=400, detail="Bu davrda yetkazilgan buyurtmalar yo'q")
     
-    total_sales = sum(order.total_amount for order in orders)
+    total_sales = sum(order.final_total_amount for order in orders)
     salary_amount = (total_sales * data.percentage) / 100
     
     payment = SalaryPayment(

@@ -39,6 +39,9 @@ class OrderList(BaseModel):
     rating: Optional[int] = None
     rating_comment: Optional[str] = None
     total_amount: float
+    base_total_amount: float
+    final_total_amount: float
+    is_price_locked: bool
     has_bonus: bool = False # Yangi
     bonus_description: Optional[str] = None # Masalan: "Suv (1), Non (2)"
 
@@ -49,6 +52,9 @@ class OrderRead(BaseModel):
     id: int
     status: str
     total_amount: float
+    base_total_amount: float
+    final_total_amount: float
+    is_price_locked: bool
     delivery_time: Optional[str] = None
     created_at: datetime
     assigned_at: Optional[datetime] = None
@@ -61,6 +67,7 @@ class OrderRead(BaseModel):
     user_phone: str
     user_address: str
     user_telegram_id: str
+    user_type: str # Yangi
     
     # Courier ma'lumotlari
     courier_id: Optional[int] = None
@@ -85,6 +92,10 @@ class OrderAssign(BaseModel):
 # Kuryer qabul qilishi uchun (vaqt bilan)
 class OrderAccept(BaseModel):
     delivery_time: str
+    courier_telegram_id: str
+
+class OrderDeliver(BaseModel):
+    courier_telegram_id: str
 
 # Rating berish uchun
 class OrderRate(BaseModel):
@@ -94,3 +105,14 @@ class OrderRate(BaseModel):
 class BonusItemCreate(BaseModel):
     product_id: int
     quantity: int
+
+class OrderBonus(BaseModel):
+    courier_telegram_id: str
+    items: List[BonusItemCreate]
+
+class OrderPriceUpdate(BaseModel):
+    new_price: float
+    courier_telegram_id: str
+
+class OrderLock(BaseModel):
+    courier_telegram_id: str

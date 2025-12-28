@@ -8,16 +8,19 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     telegram_id: str
+    user_type: Optional[str] = "standard"
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    user_type: Optional[str] = None
 
 class UserRead(UserBase):
     id: int
     telegram_id: str
     status: str
+    user_type: str
 
     model_config = {
         "from_attributes": True

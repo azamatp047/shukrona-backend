@@ -103,6 +103,7 @@ def unblock_user(user_id: int, db: Session = Depends(get_db), admin_id: str = De
 @router.get("/", response_model=list[UserRead], summary="Barcha foydalanuvchilar (Admin)")
 def get_all_users(
     status: str = None,
+    user_type: str = None,
     limit: int = 5,
     offset: int = 0,
     db: Session = Depends(get_db), 
@@ -114,10 +115,13 @@ def get_all_users(
     - **status**: active yoki blocked.
     - **limit**: nechta qaytarish (default 5).
     - **offset**: qanchasini o'tkazib yuborish.
+    - **user_type**: standard yoki maxsus.
     """
     query = db.query(User)
     if status:
         query = query.filter(User.status == status)
+    if user_type:
+        query = query.filter(User.user_type == user_type)
     
     return query.offset(offset).limit(limit).all()
 
@@ -172,5 +176,33 @@ def get_one_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    return user
+
+@router.post("/{user_id}/standard/", response_model=UserRead, summary="User turini 'standard'ga o'zgartirish (Admin)")
+def set_user_standard(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Foydalanuvchi turini 'standard' (oddiy) qilish.**
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    user.user_type = "standard"
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.post("/{user_id}/maxsus/", response_model=UserRead, summary="User turini 'maxsus'ga o'zgartirish (Admin)")
+def set_user_maxsus(user_id: int, db: Session = Depends(get_db), admin_id: str = Depends(require_admin)):
+    """
+    **Foydalanuvchi turini 'maxsus' (maxsus) qilish.**
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+    
+    user.user_type = "maxsus"
+    db.commit()
+    db.refresh(user)
     return user
 

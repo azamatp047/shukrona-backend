@@ -93,25 +93,12 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
     rated_orders = [o.rating for o in orders if o.rating is not None]
     avg_rating = sum(rated_orders) / len(rated_orders) if rated_orders else 0.0
     
-    history_list = []
-    for o in orders:
-        history_list.append(CourierOrderSummary(
-            order_id=o.id,
-            total_amount=o.total_amount,
-            delivered_at=o.delivered_at,
-            user_name=o.user.name if o.user else "Noma'lum",
-            user_address=o.user.address if o.user else "Noma'lum",
-            rating=o.rating,
-            rating_comment=o.rating_comment
-        ))
-        
     return CourierStats(
         courier_id=courier.id,
         courier_name=courier.name,
         total_delivered_orders=total_count,
         total_money_collected=total_money,
-        average_rating=round(avg_rating, 1),
-        history=history_list
+        average_rating=round(avg_rating, 1)
     )
 
 # 3. Kuryer o'z tarixini ko'rishi (Telegram ID orqali)

@@ -11,6 +11,7 @@ class User(Base):
     address = Column(String)
     telegram_id = Column(String, unique=True, index=True)
     status = Column(String, default="active")
+    user_type = Column(String, default="standard") # standard yoki maxsus
     created_at = Column(DateTime, default=datetime.utcnow)
     
     orders = relationship("Order", back_populates="user")
@@ -58,6 +59,9 @@ class Order(Base):
     delivered_at = Column(DateTime, nullable=True)
     
     total_amount = Column(Float, default=0.0) # Faqat sotish narxi bo'yicha summa
+    base_total_amount = Column(Float, default=0.0)
+    final_total_amount = Column(Float, default=0.0)
+    is_price_locked = Column(Boolean, default=False)
     
     # Rating tizimi
     rating = Column(Integer, nullable=True) # 1-5 yulduz
@@ -115,3 +119,15 @@ class Admin(Base):
     username = Column(String)
     password_hash = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class OrderPriceHistory(Base):
+    __tablename__ = "order_price_history"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"))
+    courier_id = Column(Integer, ForeignKey("couriers.id"))
+    previous_price = Column(Float)
+    new_price = Column(Float)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    order = relationship("Order")
+    courier = relationship("Courier")

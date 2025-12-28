@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import SessionLocal
-from app.models import Order, User, Product, Courier, OrderItem
+from app.models import Order, User, Product, Courier, OrderItem, OrderPriceHistory
 from app.schemas.order import (
-    OrderCreate, OrderRead, OrderList, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate
+    OrderCreate, OrderRead, OrderList, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate, OrderPriceUpdate,
+    OrderDeliver, OrderBonus, OrderLock
 )
 from app.dependencies import require_admin
 from app.config import MAX_USER_PENDING_ORDERS
@@ -46,6 +47,9 @@ def format_order_response(order: Order) -> OrderRead:
         id=order.id,
         status=order.status,
         total_amount=order.total_amount,
+        base_total_amount=order.base_total_amount,
+        final_total_amount=order.final_total_amount,
+        is_price_locked=order.is_price_locked,
         delivery_time=order.delivery_time,
         created_at=order.created_at,
         assigned_at=order.assigned_at,
@@ -56,6 +60,7 @@ def format_order_response(order: Order) -> OrderRead:
         user_phone=order.user.phone,
         user_address=order.user.address,
         user_telegram_id=order.user.telegram_id,
+        user_type=order.user.user_type,
         courier_id=order.courier_id,
         courier_name=order.courier.name if order.courier else None,
         courier_phone=c_phone,
@@ -87,6 +92,9 @@ def format_order_list_response(order: Order) -> OrderList:
         rating=order.rating,
         rating_comment=order.rating_comment,
         total_amount=order.total_amount,
+        base_total_amount=order.base_total_amount,
+        final_total_amount=order.final_total_amount,
+        is_price_locked=order.is_price_locked,
         has_bonus=has_bonus,
         bonus_description=bonus_desc
     )
@@ -169,6 +177,8 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         total_price += (product.sell_price * item.quantity)
     
     db_order.total_amount = total_price
+    db_order.base_total_amount = total_price
+    db_order.final_total_amount = total_price
     db.commit()
     db.refresh(db_order)
     
@@ -350,6 +360,10 @@ async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(g
     order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Topilmadi")
     
+    courier = db.query(Courier).filter(Courier.telegram_id == data.courier_telegram_id).first()
+    if not courier or order.courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer buyurtmani qabul qila oladi")
+
     order.status = "kuryerda" 
     order.delivery_time = data.delivery_time
     order.accepted_at = datetime.utcnow()
@@ -375,7 +389,7 @@ async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(g
 
 # 4. Deliver (Yetkazildi)
 @router.patch("/{order_id}/deliver/", response_model=OrderRead, summary="Buyurtmani yetkazildi deb belgilash")
-async def deliver_order(order_id: int, db: Session = Depends(get_db)):
+async def deliver_order(order_id: int, data: OrderDeliver, db: Session = Depends(get_db)):
     """
     **Buyurtma yetkazib berilganda ishlatiladi.**
     
@@ -386,6 +400,10 @@ async def deliver_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Topilmadi")
     
+    courier = db.query(Courier).filter(Courier.telegram_id == data.courier_telegram_id).first()
+    if not courier or order.courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer yetkazildi deb belgilay oladi")
+
     order.status = "yetkazildi" 
     order.delivered_at = datetime.utcnow()
     
@@ -459,7 +477,7 @@ def get_order_by_id(order_id: int, db: Session = Depends(get_db)):
 
 # 4.7 Add Bonus Items
 @router.post("/{order_id}/bonus/", response_model=OrderRead, summary="Bonus (tekin) mahsulot qo'shish")
-async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Session = Depends(get_db)):
+async def add_bonus_items(order_id: int, data: OrderBonus, db: Session = Depends(get_db)):
     """
     **Kuryer tomonidan buyurtmaga bonus qo'shish.**
     
@@ -470,10 +488,14 @@ async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Sessi
     order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
     if not order: raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
     
+    courier = db.query(Courier).filter(Courier.telegram_id == data.courier_telegram_id).first()
+    if not courier or order.courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer bonus qo'shishi mumkin")
+
     if order.status != "kuryerda":
         raise HTTPException(status_code=400, detail="Faqat kuryerdagi buyurtmalarga bonus qo'shish mumkin")
     
-    for item in items:
+    for item in data.items:
         product = db.query(Product).filter(Product.id == item.product_id).first()
         if not product:
             continue
@@ -493,6 +515,61 @@ async def add_bonus_items(order_id: int, items: List[BonusItemCreate], db: Sessi
         )
         db.add(db_item)
     
+    db.commit()
+    db.refresh(order)
+    
+    return format_order_response(order)
+
+@router.patch("/{order_id}/update-price/", response_model=OrderRead, summary="Buyurtma narxini o'zgartirish (Kuryer)")
+async def update_order_price(order_id: int, data: OrderPriceUpdate, db: Session = Depends(get_db)):
+    """
+    **Kuryer tomonidan buyurtma narxini o'zgartirish.**
+    
+    - Faqat biriktirilgan kuryer o'zgartira oladi.
+    - Narx bloklanmagan (locked) bo'lishi kerak.
+    - Har bir o'zgarish loglanadi.
+    """
+    order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
+    if not order: raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+    
+    if order.is_price_locked:
+        raise HTTPException(status_code=400, detail="Narx bloklangan, uni o'zgartirib bo'lmaydi")
+    
+    courier = db.query(Courier).filter(Courier.telegram_id == data.courier_telegram_id).first()
+    if not courier or order.courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer narxni o'zgartira oladi")
+    
+    # Log the change
+    history = OrderPriceHistory(
+        order_id=order.id,
+        courier_id=courier.id,
+        previous_price=order.final_total_amount,
+        new_price=data.new_price
+    )
+    db.add(history)
+    
+    order.final_total_amount = data.new_price
+    db.commit()
+    db.refresh(order)
+    
+    return format_order_response(order)
+
+@router.patch("/{order_id}/lock-price/", response_model=OrderRead, summary="Buyurtma narxini bloklash (Kuryer)")
+async def lock_order_price(order_id: int, data: OrderLock, db: Session = Depends(get_db)):
+    """
+    **Kuryer tomonidan buyurtma narxini yakuniy deb bloklash.**
+    
+    - Bloklangandan keyin narxni o'zgartirib bo'lmaydi.
+    - Bu narx moliya tizimi uchun asosiy manba hisoblanadi.
+    """
+    order = db.query(Order).options(joinedload(Order.user), joinedload(Order.courier)).filter(Order.id == order_id).first()
+    if not order: raise HTTPException(status_code=404, detail="Buyurtma topilmadi")
+    
+    courier = db.query(Courier).filter(Courier.telegram_id == data.courier_telegram_id).first()
+    if not courier or order.courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="Faqat biriktirilgan kuryer narxni bloklay oladi")
+    
+    order.is_price_locked = True
     db.commit()
     db.refresh(order)
     

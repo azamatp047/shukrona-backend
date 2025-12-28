@@ -48,6 +48,3 @@ class CourierStats(BaseModel):
     total_delivered_orders: int # Nechta buyurtma yetkazdi
     total_money_collected: float # Qancha summa yig'di (savdo)
     average_rating: float = 0.0 # O'rtacha baho
-    
-    # Tarix ro'yxati
-    history: List[CourierOrderSummary]
