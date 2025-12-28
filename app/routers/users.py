@@ -157,11 +157,15 @@ def get_user_stats(
     total = db.query(User).count()
     active = db.query(User).filter(User.status == "active").count()
     blocked = db.query(User).filter(User.status == "blocked").count()
+    standard = db.query(User).filter(User.user_type == "standard").count()
+    maxsus = db.query(User).filter(User.user_type == "maxsus").count()
     
     return UserStats(
         total_count=total,
         active_count=active,
-        blocked_count=blocked
+        blocked_count=blocked,
+        standard_count=standard,
+        maxsus_count=maxsus
     )
 
 @router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")

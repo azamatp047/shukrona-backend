@@ -37,10 +37,14 @@ class UserStats(BaseModel):
     total_count: int
     active_count: int
     blocked_count: int
+    standard_count: int
+    maxsus_count: int
 
 class UserListResponse(BaseModel):
     total_count: int
     active_count: int
     blocked_count: int
+    standard_count: int
+    maxsus_count: int
     limit: int
     users: List[UserRead]

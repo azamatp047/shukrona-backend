@@ -87,7 +87,7 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
     orders = query.order_by(Order.delivered_at.desc()).all()
     
     total_count = len(orders)
-    total_money = sum(o.total_amount for o in orders)
+    total_money = sum(o.final_total_amount for o in orders)
     
     # Rating hisoblash
     rated_orders = [o.rating for o in orders if o.rating is not None]
