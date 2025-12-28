@@ -15,6 +15,39 @@ if not os.path.exists("static/images"):
 
 # Yangi jadvallarni yaratish
 Base.metadata.create_all(bind=engine)
+
+# ================= AUTOMATIK MIGRATSIYA (Self-Healing) =================
+def run_manual_migrations():
+    with engine.connect() as conn:
+        # 1. users.user_type
+        try:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR DEFAULT 'standard';"))
+        except: pass
+        
+        # 2. orders columns
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS base_total_amount FLOAT DEFAULT 0.0;"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS final_total_amount FLOAT DEFAULT 0.0;"))
+            conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_price_locked BOOLEAN DEFAULT FALSE;"))
+        except: pass
+
+        # 3. order_price_history table
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS order_price_history (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER REFERENCES orders(id),
+                    courier_id INTEGER REFERENCES couriers(id),
+                    previous_price FLOAT,
+                    new_price FLOAT,
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
+        except: pass
+        
+        conn.commit()
+
+run_manual_migrations()
 # =================================================================
 
 # Taglar uchun tavsiflar (Swagger UI da ko'rinadi)
