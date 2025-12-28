@@ -7,7 +7,8 @@ from datetime import date
 from app.database import SessionLocal
 from app.models import Order, OrderItem, SalaryPayment, Expense, Courier, Product
 from app.schemas.finance import (
-    ProfitStats, SalaryCalculateRequest, SalaryPaymentRead, 
+    ProfitStats, SalaryCalculateRequest, SalaryCalculationResponse,
+    SalaryPaymentCreate, SalaryPaymentRead, 
     ExpenseCreate, ExpenseRead, ProductPerformance
 )
 from app.dependencies import require_admin
@@ -118,41 +119,66 @@ def get_analytics(
         products_breakdown=breakdown_list
     )
 
-@router.post("/pay-salary/", response_model=SalaryPaymentRead, summary="Kuryerga oylik to'lash")
-def pay_courier_salary(
-    data: SalaryCalculateRequest,
+@router.get("/calculate-salary/", response_model=SalaryCalculationResponse, summary="Kuryer oyligini hisoblash (Saqlamasdan)")
+def calculate_salary(
+    courier_id: int,
+    start_date: date,
+    end_date: date,
+    percentage: float,
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
     """
-    **Kuryerning ish haqqini hisoblash va to'lash.**
+    **Kuryerning ish haqqini hisoblab beradi.**
     
-    - Belgilangan sanalar oralig'idagi savdo summasining foizi hisoblanadi.
+    Bu endpoint bazaga saqlamaydi, faqat hisoblab javob qaytaradi.
+    """
+    courier = db.query(Courier).filter(Courier.id == courier_id).first()
+    if not courier:
+        raise HTTPException(status_code=404, detail="Kuryer topilmadi")
+        
+    orders = db.query(Order).filter(
+        Order.courier_id == courier_id,
+        Order.status == "yetkazildi",
+        func.date(Order.delivered_at) >= start_date,
+        func.date(Order.delivered_at) <= end_date
+    ).all()
+    
+    total_sales = sum(order.final_total_amount for order in orders)
+    salary_amount = (total_sales * percentage) / 100
+    
+    return SalaryCalculationResponse(
+        courier_id=courier_id,
+        courier_name=courier.name,
+        total_sales=total_sales,
+        salary_amount=salary_amount,
+        orders_count=len(orders),
+        start_date=start_date,
+        end_date=end_date,
+        percentage=percentage
+    )
+
+@router.post("/pay-salary/", response_model=SalaryPaymentRead, summary="Oylik to'lovini saqlash")
+def pay_courier_salary(
+    data: SalaryPaymentCreate,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Kuryerga oylik to'langanligi haqida ma'lumotni saqlash.**
+    
+    Bu endpoint hisob-kitob qilmaydi, faqat yuborilgan ma'lumotlarni bazaga yozadi.
     """
     courier = db.query(Courier).filter(Courier.id == data.courier_id).first()
     if not courier:
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")
         
-    orders = db.query(Order).filter(
-        Order.courier_id == data.courier_id,
-        Order.status == "yetkazildi",
-        func.date(Order.delivered_at) >= data.start_date,
-        func.date(Order.delivered_at) <= data.end_date
-    ).all()
-    
-    if not orders:
-        raise HTTPException(status_code=400, detail="Bu davrda yetkazilgan buyurtmalar yo'q")
-    
-    total_sales = sum(order.final_total_amount for order in orders)
-    salary_amount = (total_sales * data.percentage) / 100
-    
     payment = SalaryPayment(
         courier_id=data.courier_id,
-        amount=salary_amount,
+        amount=data.amount,
         percentage=data.percentage,
         start_date=data.start_date,
-        end_date=data.end_date,
-        note=f"Jami savdo: {total_sales}. {data.percentage}% ulush."
+        end_date=data.end_date
     )
     db.add(payment)
     db.commit()
@@ -160,6 +186,25 @@ def pay_courier_salary(
     
     payment.courier_name = courier.name 
     return payment
+
+@router.delete("/salaries/{payment_id}/", summary="Oylik to'lovini o'chirish (Admin)")
+def delete_salary_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Berilgan oylik to'lovini tizimdan o'chirish.**
+    
+    Xatolik yuz berganda to'lovni bekor qilish uchun ishlatiladi.
+    """
+    payment = db.query(SalaryPayment).filter(SalaryPayment.id == payment_id).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="To'lov topilmadi")
+    
+    db.delete(payment)
+    db.commit()
+    return {"status": "ok", "message": "Oylik to'lovi muvaffaqiyatli o'chirildi"}
 
 @router.post("/expenses/", response_model=ExpenseRead, summary="Yangi xarajat qo'shish")
 def create_expense(
@@ -184,3 +229,20 @@ def get_expenses(db: Session = Depends(get_db), admin_id: str = Depends(require_
     **Tizimga kiritilgan barcha xarajatlar.**
     """
     return db.query(Expense).all()
+
+@router.delete("/expenses/{expense_id}/", summary="Xarajatni o'chirish (Admin)")
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(require_admin)
+):
+    """
+    **Kiritilgan xarajatni tizimdan o'chirish.**
+    """
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Xarajat topilmadi")
+    
+    db.delete(expense)
+    db.commit()
+    return {"status": "ok", "message": "Xarajat muvaffaqiyatli o'chirildi"}
