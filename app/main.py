@@ -102,6 +102,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://shukrona-admin-panel.vercel.app",
+        "https://t.me",
+        "https://web.telegram.org"
     ],
     allow_credentials=True,
     allow_methods=["*"],
