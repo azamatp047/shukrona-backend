@@ -96,11 +96,11 @@ def get_analytics(
     expense_query = db.query(func.sum(Expense.amount))
     
     if start_date:
-        salary_query = salary_query.filter(SalaryPayment.paid_at >= start_date)
-        expense_query = expense_query.filter(Expense.created_at >= start_date)
+        salary_query = salary_query.filter(func.date(SalaryPayment.paid_at) >= start_date)
+        expense_query = expense_query.filter(func.date(Expense.created_at) >= start_date)
     if end_date:
-        salary_query = salary_query.filter(SalaryPayment.paid_at <= end_date)
-        expense_query = expense_query.filter(Expense.created_at <= end_date)
+        salary_query = salary_query.filter(func.date(SalaryPayment.paid_at) <= end_date)
+        expense_query = expense_query.filter(func.date(Expense.created_at) <= end_date)
 
     total_salaries = salary_query.scalar() or 0.0
     total_expenses = expense_query.scalar() or 0.0
