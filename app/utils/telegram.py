@@ -131,6 +131,11 @@ async def notify_courier_assigned(courier_telegram_id: str, order_data: dict):
     
     await send_telegram_message(COURIER_USER_BOT_TOKEN, courier_telegram_id, msg, reply_markup=kb)
 
+async def notify_user_courier_assigned(user_telegram_id: str, order_id: int):
+    """Mijozga buyurtma kuryerga berilgani haqida (courier-user-bot orqali)"""
+    msg = f"ℹ️ <b>Buyurtma #{order_id}</b> admin tomonidan tasdiqlandi va kuryer biriktirildi."
+    await send_telegram_message(COURIER_USER_BOT_TOKEN, user_telegram_id, msg)
+
 async def notify_user_courier_accepted(user_telegram_id: str, order_id: int, delivery_time: str, courier_info: str = None):
     """Mijozga kuryer yo'lga chiqqani haqida (courier-user-bot orqali)"""
     c_info = f"\n🛵 Kuryer: {courier_info}" if courier_info else ""
