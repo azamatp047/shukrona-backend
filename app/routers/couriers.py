@@ -138,3 +138,18 @@ def get_courier_history_admin(
         raise HTTPException(status_code=404, detail="Kuryer topilmadi")
         
     return get_courier_statistics(db, courier, start_date, end_date)
+
+# 5. Kuryer borligini tekshirish (Bot start uchun)
+@router.get("/check-messenger/{telegram_id}/", summary="Kuryer bazada borligini tekshirish")
+def check_courier_exists(telegram_id: str, db: Session = Depends(get_db)):
+    """
+    **Kuryer bazada ro'yxatdan o'tganligini tekshirish (Bot orqali).**
+    
+    - Bazada bo'lsa: 200 OK qaytadi.
+    - Bazada bo'lmasa: 404 Not Found qaytadi.
+    """
+    courier = db.query(Courier).filter(Courier.telegram_id == telegram_id).first()
+    if not courier:
+        raise HTTPException(status_code=404, detail="Kuryer topilmadi. Iltimos, adminga murojaat qiling.")
+    
+    return {"status": 200, "message": "Kuryer topildi", "courier_name": courier.name}

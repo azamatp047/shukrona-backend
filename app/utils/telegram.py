@@ -3,15 +3,30 @@ import httpx
 import logging
 from dotenv import load_dotenv
 
-load_dotenv()
+# .env faylini qidirish (app/utils/telegram.py dan 2 qavat tepada)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))
+env_path = os.path.join(project_root, ".env")
+
+# Birinchi loyiha ildizidan, keyin joriy papkadan qidiradi
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv()
 
 # Logger sozlamalari
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Tokenlar
-ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT_TOKEN")
-COURIER_USER_BOT_TOKEN = os.getenv("COURIER_USER_BOT_TOKEN")
+# Tokenlar - .env dagi nomlarni tekshiring!
+ADMIN_BOT_TOKEN = os.getenv("ADMIN_BOT")
+COURIER_USER_BOT_TOKEN = os.getenv("COURIER_USER_BOT")
+
+if not ADMIN_BOT_TOKEN:
+    logger.error("!!! ERROR: ADMIN_BOT topilmadi. .env faylini tekshiring !!!")
+if not COURIER_USER_BOT_TOKEN:
+    logger.error("!!! ERROR: COURIER_USER_BOT topilmadi. .env faylini tekshiring !!!")
+
 BACKEND_URL = os.getenv("BACKEND_URL")
 
 # Admin IDs (ro'yxat sifatida)
