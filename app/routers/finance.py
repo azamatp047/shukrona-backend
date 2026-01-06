@@ -124,7 +124,6 @@ def calculate_salary(
     courier_id: int,
     start_date: date,
     end_date: date,
-    percentage: float,
     db: Session = Depends(get_db),
     admin_id: str = Depends(require_admin)
 ):
@@ -142,20 +141,19 @@ def calculate_salary(
         Order.status == "yetkazildi",
         func.date(Order.delivered_at) >= start_date,
         func.date(Order.delivered_at) <= end_date
-    ).all()
+    ).options(joinedload(Order.items)).all()
     
     total_sales = sum(order.final_total_amount for order in orders)
-    salary_amount = (total_sales * percentage) / 100
+    items_count = sum(sum(item.quantity for item in order.items) for order in orders)
     
     return SalaryCalculationResponse(
         courier_id=courier_id,
         courier_name=courier.name,
         total_sales=total_sales,
-        salary_amount=salary_amount,
         orders_count=len(orders),
+        items_count=items_count,
         start_date=start_date,
-        end_date=end_date,
-        percentage=percentage
+        end_date=end_date
     )
 
 @router.post("/pay-salary/", response_model=SalaryPaymentRead, summary="Oylik to'lovini saqlash")
@@ -176,7 +174,7 @@ def pay_courier_salary(
     payment = SalaryPayment(
         courier_id=data.courier_id,
         amount=data.amount,
-        percentage=data.percentage,
+        percentage=0.0, # Removed feature
         start_date=data.start_date,
         end_date=data.end_date
     )

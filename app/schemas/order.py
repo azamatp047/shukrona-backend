@@ -26,6 +26,7 @@ class OrderCreate(BaseModel):
     telegram_id: str 
     items: List[OrderItemCreate]
     delivery_time: Optional[str] = None
+    current_location: Optional[str] = None
 
 # 2. Order ma'lumotlarini o'qish (Javob uchun)
 class OrderList(BaseModel):
@@ -44,6 +45,7 @@ class OrderList(BaseModel):
     is_price_locked: bool
     has_bonus: bool = False # Yangi
     bonus_description: Optional[str] = None # Masalan: "Suv (1), Non (2)"
+    current_location: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -59,7 +61,9 @@ class OrderRead(BaseModel):
     created_at: datetime
     assigned_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
+    current_location: Optional[str] = None
     
     # User ma'lumotlari
     user_id: int
@@ -126,3 +130,7 @@ class OrderCourierHistory(BaseModel):
 
     class Config:
         from_attributes = True
+
+class OrderStatusResponse(BaseModel):
+    status: str
+    message: str

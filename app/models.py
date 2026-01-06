@@ -66,6 +66,8 @@ class Order(Base):
     # Rating tizimi
     rating = Column(Integer, nullable=True) # 1-5 yulduz
     rating_comment = Column(Text, nullable=True) # Izoh
+
+    current_location = Column(String, nullable=True) # Buyurtma berilgandagi lokatsiya
     
     user = relationship("User", back_populates="orders")
     courier = relationship("Courier", back_populates="orders")

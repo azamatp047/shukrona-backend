@@ -8,7 +8,7 @@ from app.database import SessionLocal
 from app.models import Order, User, Product, Courier, OrderItem, OrderPriceHistory
 from app.schemas.order import (
     OrderCreate, OrderRead, OrderList, OrderAssign, OrderAccept, OrderItemRead, OrderRate, BonusItemCreate, OrderPriceUpdate,
-    OrderDeliver, OrderBonus, OrderLock, OrderCourierHistory
+    OrderDeliver, OrderBonus, OrderLock, OrderCourierHistory, OrderStatusResponse
 )
 from app.dependencies import require_admin
 from app.config import MAX_USER_PENDING_ORDERS
@@ -55,6 +55,7 @@ def format_order_response(order: Order) -> OrderRead:
         assigned_at=order.assigned_at,
         accepted_at=order.accepted_at,
         delivered_at=order.delivered_at,
+        current_location=order.current_location,
         user_id=order.user_id,
         user_name=order.user.name,
         user_phone=order.user.phone,
@@ -83,6 +84,7 @@ def format_order_list_response(order: Order) -> OrderList:
 
     return OrderList(
         id=order.id,
+        current_location=order.current_location,
         user_id=order.user_id,
         courier_id=order.courier_id,
         user_name=order.user.name,
@@ -111,7 +113,7 @@ from app.utils.telegram import (
 # ... (Imports qoladi)
 
 # 1. CREATE ORDER (Ombor logikasi bilan)
-@router.post("/", response_model=OrderRead, status_code=201, summary="Yangi buyurtma yaratish")
+@router.post("/", response_model=OrderStatusResponse, status_code=201, summary="Yangi buyurtma yaratish")
 async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     """
     **Foydalanuvchi tomonidan yangi buyurtma yaratish.**
@@ -125,6 +127,9 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     3. Ombor qoldig'ini kamaytiradi.
     4. Umumiy summani hisoblaydi.
     5. Adminga xabar yuboradi.
+    
+    Javob:
+    - Muvaffaqiyatli bo'lsa: {"status": "ok", "message": "Buyurtma qabul qilindi"}
     """
     user = db.query(User).filter(User.telegram_id == order_in.telegram_id).first()
     if not user:
@@ -147,7 +152,8 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         user_id=user.id,
         status="kutilmoqda", 
         total_amount=0.0,
-        delivery_time=order_in.delivery_time
+        delivery_time=order_in.delivery_time,
+        current_location=order_in.current_location
     )
     db.add(db_order)
     db.commit()
@@ -163,6 +169,7 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         # OMBOR TEKSHIRUVI (soddalashtirilgan)
         if product.stock < item.quantity:
             pass 
+            # raise HTTPException(status_code=400, detail=f"{product.name} yetarli emas")
 
         product.stock -= item.quantity
         
@@ -196,7 +203,7 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
         print(f"Notification Error: {e}")
     # --- NOTIFICATION END ---
 
-    return format_order_response(db_order)
+    return OrderStatusResponse(status="ok", message="Buyurtma muvaffaqiyatli yaratildi")
 
 # Admin uchun GET
 @router.get("/admin/", response_model=List[OrderList], summary="Barcha buyurtmalarni olish (Admin)")
@@ -318,7 +325,7 @@ def get_orders_user(
     return [format_order_response(o) for o in orders]
 
 # 2. Assign Courier
-@router.patch("/{order_id}/assign/", response_model=OrderRead, summary="Kuryer biriktirish (Admin)")
+@router.patch("/{order_id}/assign/", response_model=OrderStatusResponse, summary="Kuryer biriktirish (Admin)")
 async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends(get_db)):
     """
     **Buyurtmani kuryerga biriktirish.**
@@ -356,10 +363,10 @@ async def assign_courier(order_id: int, data: OrderAssign, db: Session = Depends
         print(f"Notification Error: {e}")
     # --- NOTIFICATION END ---
     
-    return format_order_response(order)
+    return OrderStatusResponse(status="ok", message="Kuryer muvaffaqiyatli biriktirildi")
 
 # 3. Accept (Kuryerda)
-@router.patch("/{order_id}/accept/", response_model=OrderRead, summary="Buyurtmani qabul qilish (Kuryer)")
+@router.patch("/{order_id}/accept/", response_model=OrderStatusResponse, summary="Buyurtmani qabul qilish (Kuryer)")
 async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(get_db)):
     """
     **Kuryer buyurtmani qabul qilishi.**
@@ -396,10 +403,10 @@ async def accept_order(order_id: int, data: OrderAccept, db: Session = Depends(g
         print(f"Notification Error: {e}")
     # --- NOTIFICATION END ---
 
-    return format_order_response(order)
+    return OrderStatusResponse(status="ok", message="Buyurtma qabul qilindi")
 
 # 4. Deliver (Yetkazildi)
-@router.patch("/{order_id}/deliver/", response_model=OrderRead, summary="Buyurtmani yetkazildi deb belgilash")
+@router.patch("/{order_id}/deliver/", response_model=OrderStatusResponse, summary="Buyurtmani yetkazildi deb belgilash")
 async def deliver_order(order_id: int, data: OrderDeliver, db: Session = Depends(get_db)):
     """
     **Buyurtma yetkazib berilganda ishlatiladi.**
@@ -436,13 +443,10 @@ async def deliver_order(order_id: int, data: OrderDeliver, db: Session = Depends
         print(f"Notification Error: {e}")
     # --- NOTIFICATION END ---
     
-    return format_order_response(order)
-
-    
-    return format_order_response(order)
+    return OrderStatusResponse(status="ok", message="Buyurtma yetkazildi")
 
 # 4.5. Rate Order (Baho berish)
-@router.post("/{order_id}/rate/", response_model=OrderRead, summary="Buyurtmani baholash")
+@router.post("/{order_id}/rate/", response_model=OrderStatusResponse, summary="Buyurtmani baholash")
 async def rate_order(order_id: int, data: OrderRate, db: Session = Depends(get_db)):
     """
     **Mijoz tomonidan kuryer xizmatini baholash.**
@@ -466,9 +470,9 @@ async def rate_order(order_id: int, data: OrderRate, db: Session = Depends(get_d
     db.commit()
     db.refresh(order)
     
-    return format_order_response(order)
+    return OrderStatusResponse(status="ok", message="Baho muvaffaqiyatli saqlandi")
 
-    return format_order_response(order)
+
 
 # 4.6 Get One Order
 @router.get("/{order_id}/", response_model=OrderRead, summary="Bitta buyurtma haqida ma'lumot")

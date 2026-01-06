@@ -3,26 +3,24 @@ from typing import List, Optional
 from datetime import date, datetime
 
 # --- OYLIK BERISH ---
+# --- OYLIK BERISH ---
 class SalaryCalculateRequest(BaseModel):
     courier_id: int
     start_date: date
     end_date: date
-    percentage: float 
 
 class SalaryCalculationResponse(BaseModel):
     courier_id: int
     courier_name: str
     total_sales: float
-    salary_amount: float
     orders_count: int
+    items_count: int
     start_date: date
     end_date: date
-    percentage: float
 
 class SalaryPaymentCreate(BaseModel):
     courier_id: int
     amount: float
-    percentage: float
     start_date: date
     end_date: date
 
@@ -30,7 +28,6 @@ class SalaryPaymentRead(BaseModel):
     id: int
     courier_name: str
     amount: float
-    percentage: float
     start_date: date
     end_date: date
     paid_at: datetime
