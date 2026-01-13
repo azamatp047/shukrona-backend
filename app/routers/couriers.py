@@ -1,7 +1,7 @@
 from typing import List
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import SessionLocal
@@ -84,10 +84,13 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
     if end_date:
         query = query.filter(func.date(Order.delivered_at) <= end_date)
     
-    orders = query.order_by(Order.delivered_at.desc()).all()
+    orders = query.options(joinedload(Order.items)).order_by(Order.delivered_at.desc()).all()
     
     total_count = len(orders)
     total_money = sum(o.final_total_amount for o in orders)
+    
+    # Calculate total items sold
+    total_items = sum(sum(item.quantity for item in o.items) for o in orders)
     
     # Rating hisoblash
     rated_orders = [o.rating for o in orders if o.rating is not None]
@@ -97,6 +100,7 @@ def get_courier_statistics(db: Session, courier: Courier, start_date: date = Non
         courier_id=courier.id,
         courier_name=courier.name,
         total_delivered_orders=total_count,
+        total_items_sold=total_items,
         total_money_collected=total_money,
         average_rating=round(avg_rating, 1)
     )

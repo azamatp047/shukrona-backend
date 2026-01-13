@@ -46,5 +46,6 @@ class CourierStats(BaseModel):
     courier_name: str
     
     total_delivered_orders: int # Nechta buyurtma yetkazdi
+    total_items_sold: int = 0 # Nechta mahsulot sotdi
     total_money_collected: float # Qancha summa yig'di (savdo)
     average_rating: float = 0.0 # O'rtacha baho
