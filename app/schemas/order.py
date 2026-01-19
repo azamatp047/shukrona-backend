@@ -57,8 +57,11 @@ class OrderRead(BaseModel):
     base_total_amount: float
     final_total_amount: float
     is_price_locked: bool
+    is_price_locked: bool
     delivery_time: Optional[str] = None
     created_at: datetime
+    # Yangi: Foydalanuvchining shu oydagi nechanchi buyurtmasi
+    month_order_count: Optional[str] = None
     assigned_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None

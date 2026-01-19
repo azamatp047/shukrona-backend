@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import User
-from app.schemas.user import UserCreate, UserRead, UserUpdate, UserShort, UserStats
+from app.models import User, Order, OrderItem
+from app.schemas.user import UserCreate, UserRead, UserUpdate, UserShort, UserStats, UserOrderStats
+from datetime import date, datetime, time
+from sqlalchemy import func
 from app.dependencies import require_admin # Admin tekshiruvi
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -166,6 +169,55 @@ def get_user_stats(
         blocked_count=blocked,
         standard_count=standard,
         maxsus_count=maxsus
+
+    )
+
+@router.get("/stats/orders/by-telegram/{telegram_id}/", response_model=UserOrderStats, summary="User order stats by telegram_id")
+def get_user_order_stats(
+    telegram_id: str,
+    start_date: str = Query(..., description="YYYY-MM-DD"),
+    end_date: str = Query(..., description="YYYY-MM-DD"),
+    db: Session = Depends(get_db)
+):
+    """
+    **Userning buyurtmalari va mahsulotlari soni (Date range).**
+    
+    Telegram ID orqali.
+    """
+    # Parse dates flexibly (handle 2026-2-2)
+    def parse_date_str(d_str: str) -> date:
+        try:
+            return datetime.strptime(d_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date format: {d_str}. Use YYYY-MM-DD")
+
+    s_date = parse_date_str(start_date)
+    e_date = parse_date_str(end_date)
+
+    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Foydalanuvchi topilmadi")
+
+    start_dt = datetime.combine(s_date, time.min)
+    end_dt = datetime.combine(e_date, time.max)
+
+    # Count orders
+    orders_count = db.query(Order).filter(
+        Order.user_id == user.id,
+        Order.created_at >= start_dt,
+        Order.created_at <= end_dt
+    ).count()
+
+    # Count items
+    items_count = db.query(func.sum(OrderItem.quantity)).join(Order).filter(
+        Order.user_id == user.id,
+        Order.created_at >= start_dt,
+        Order.created_at <= end_dt
+    ).scalar() or 0
+
+    return UserOrderStats(
+        orders_count=orders_count,
+        items_count=items_count
     )
 
 @router.get("/{user_id}/", response_model=UserRead, summary="Bitta foydalanuvchi ma'lumotlari (Admin)")

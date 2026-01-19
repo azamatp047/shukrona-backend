@@ -48,3 +48,7 @@ class UserListResponse(BaseModel):
     maxsus_count: int
     limit: int
     users: List[UserRead]
+
+class UserOrderStats(BaseModel):
+    orders_count: int
+    items_count: int
