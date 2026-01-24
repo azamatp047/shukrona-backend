@@ -60,15 +60,17 @@ def format_order_response(order: Order, db: Session = None) -> OrderRead:
                 Order.created_at <= order.created_at
             ).count()
             
+            
             month_msg = f"{order.created_at.month:02d} oy uchun {count}-buyurtmasi"
 
-            # 3. Global hisob (Kompaniya bo'yicha)
+            # 3. Global hisob (Kompaniya bo'yicha) - DAILY
+            start_of_day = order.created_at.replace(hour=0, minute=0, second=0, microsecond=0)
             count_global = db.query(Order).filter(
-                Order.created_at >= start_of_month,
+                Order.created_at >= start_of_day,
                 Order.created_at <= order.created_at
             ).count()
 
-            month_msg_global = f"{order.created_at.month:02d} oy uchun {count_global}-buyurtma"
+            month_msg_global = f"{order.created_at.date()} uchun {count_global}-buyurtma"
 
         except Exception as e:
             print(f"Error calculating order count: {e}")
@@ -223,13 +225,13 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     
     # --- NOTIFICATION START ---
     try:
-        # Calculate global order count for notification
-        start_of_month = db_order.created_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Calculate global order count for notification (DAILY)
+        start_of_day = db_order.created_at.replace(hour=0, minute=0, second=0, microsecond=0)
         global_count = db.query(Order).filter(
-            Order.created_at >= start_of_month,
+            Order.created_at >= start_of_day,
             Order.created_at <= db_order.created_at
         ).count()
-        global_msg = f"{db_order.created_at.month:02d} oy uchun {global_count}-buyurtma"
+        global_msg = f"{db_order.created_at.date()} uchun {global_count}-buyurtma"
 
         order_data = {
             "id": db_order.id,
