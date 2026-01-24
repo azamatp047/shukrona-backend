@@ -43,15 +43,17 @@ def format_order_response(order: Order, db: Session = None) -> OrderRead:
     
     c_phone = order.courier.phone if (order.courier and order.courier.phone) else None
 
+    
     # Calculate month_order_count
     month_msg = None
+    month_msg_global = None
     if db and order.created_at:
         try:
             # Shu oydagi buyurtmalar sonini hisoblash
             # 1. Oyning boshi
             start_of_month = order.created_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             
-            # 2. Shu oydagi ushbu userning, ushbu buyurtmadan oldingi (yoki teng) buyurtmalari soni
+            # 2. Shu oydagi ushbu userning chiquvchi buyurtmalari
             count = db.query(Order).filter(
                 Order.user_id == order.user_id,
                 Order.created_at >= start_of_month,
@@ -59,6 +61,15 @@ def format_order_response(order: Order, db: Session = None) -> OrderRead:
             ).count()
             
             month_msg = f"{order.created_at.month:02d} oy uchun {count}-buyurtmasi"
+
+            # 3. Global hisob (Kompaniya bo'yicha)
+            count_global = db.query(Order).filter(
+                Order.created_at >= start_of_month,
+                Order.created_at <= order.created_at
+            ).count()
+
+            month_msg_global = f"{order.created_at.month:02d} oy uchun {count_global}-buyurtma"
+
         except Exception as e:
             print(f"Error calculating order count: {e}")
 
@@ -72,6 +83,7 @@ def format_order_response(order: Order, db: Session = None) -> OrderRead:
         delivery_time=order.delivery_time,
         created_at=order.created_at,
         month_order_count=month_msg,
+        month_order_count_global=month_msg_global,
         assigned_at=order.assigned_at,
         accepted_at=order.accepted_at,
         delivered_at=order.delivered_at,
@@ -211,8 +223,17 @@ async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
     
     # --- NOTIFICATION START ---
     try:
+        # Calculate global order count for notification
+        start_of_month = db_order.created_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        global_count = db.query(Order).filter(
+            Order.created_at >= start_of_month,
+            Order.created_at <= db_order.created_at
+        ).count()
+        global_msg = f"{db_order.created_at.month:02d} oy uchun {global_count}-buyurtma"
+
         order_data = {
             "id": db_order.id,
+            "global_count_msg": global_msg,
             "user_name": user.name,
             "user_phone": user.phone,
             "user_address": user.address,

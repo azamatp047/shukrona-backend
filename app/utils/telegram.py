@@ -112,7 +112,8 @@ async def assign_order_to_courier(order_id: int, courier_id: int, admin_tg_id: i
 async def notify_admins_new_order(order_data: dict):
     """Yangi buyurtma tushganda admin-bot orqali xabar berish"""
     msg = (
-        f"🆕 <b>Yangi Buyurtma #{order_data['id']}</b>\n\n"
+        f"🆕 <b>Yangi Buyurtma #{order_data['id']}</b>\n"
+        f"📊 {order_data.get('global_count_msg', '')}\n\n"
         f"👤 Mijoz: {order_data.get('user_name', 'Noma\'lum')}\n"
         f"📞 Tel: {order_data.get('user_phone')}\n"
         f"📍 Manzil: {order_data.get('user_address')}\n"

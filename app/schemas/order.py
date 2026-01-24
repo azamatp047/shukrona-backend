@@ -62,6 +62,8 @@ class OrderRead(BaseModel):
     created_at: datetime
     # Yangi: Foydalanuvchining shu oydagi nechanchi buyurtmasi
     month_order_count: Optional[str] = None
+    # Yangi: Kompaniyaning shu oydagi nechanchi buyurtmasi
+    month_order_count_global: Optional[str] = None
     assigned_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
